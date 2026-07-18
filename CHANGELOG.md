@@ -44,6 +44,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Clarified project scope: the goal is full NetBox object coverage through
+  MCP (DCIM, IPAM, virtualization, circuits, tenancy, extras, ...), not a
+  permanent DCIM + IPAM limit. Access control is left to NetBox's own
+  per-user object permissions (via the pass-through token) rather than an
+  allow-list in the MCP server itself; `client/registry.py`'s current
+  DCIM + IPAM mapping is a first slice, extended as more tools are added.
 - Dropped the original ORM-based read path in favor of 100% REST: the
   Django ORM didn't save code over the REST API's own FilterSets/serializers/
   permissions, added a sidecar deployment constraint, and had a latent

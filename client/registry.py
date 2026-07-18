@@ -5,8 +5,13 @@ REST API path used for every operation (list/get/count/create/update/patch/
 delete) — the client is REST-only, so this is a flat name -> path mapping,
 not a Django model reference.
 
-Initial scope: DCIM + IPAM (scoping decision), to be extended as more
-tools are added.
+Target scope: every NetBox object type reachable over the REST API (DCIM,
+IPAM, virtualization, circuits, tenancy, extras, ...) — there is no
+permanent object-type allow-list here. What's registered below is current
+implementation progress, not a scoping decision: DCIM + IPAM first,
+extended incrementally as more tools are added. Access control is
+NetBox's own job (per-user token permissions, see
+`src/netbox_mcp/auth.py`), not this registry's.
 """
 
 from __future__ import annotations

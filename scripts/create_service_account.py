@@ -6,7 +6,9 @@ calling user's own NetBox token (pass-through, see
 for integration tests, CI, and local dev where no per-user token is wired
 up yet.
 
-Permissions granted:
+Permissions granted (tracks `client/registry.py`'s current object coverage,
+not a permanent limit — widen this script's app list as the registry grows
+toward full NetBox coverage):
 - DCIM + IPAM: view/add/change/delete. `delete` is included because the
   client only ever calls delete() inside an active `netbox_branching`
   branch (see `client/rest.py::NetBoxRestClient.delete`) — nothing this

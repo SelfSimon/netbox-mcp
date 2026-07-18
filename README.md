@@ -21,6 +21,16 @@ NetBox — network and IT infrastructure automation.
   and by whom. A shared service account (`svc-netbox-mcp`, see
   `scripts/create_service_account.py`) exists only as a fallback for local
   dev, tests, and CI.
+- **Full object coverage, no MCP-side allow-list**: the goal is for every
+  NetBox object type reachable over the REST API — DCIM, IPAM,
+  virtualization, circuits, tenancy, extras, and so on — to be usable
+  through MCP, not just an initial subset. What a given caller can actually
+  do is bounded by NetBox's own per-user object permissions (via the
+  pass-through token above), not by a restriction baked into this server.
+  `client/registry.py` today maps only a first slice of resources
+  (DCIM + IPAM); widening it, plus the matching schemas and tools, to the
+  rest of the NetBox data model is ongoing work, not a permanent scope
+  decision.
 
 Because it no longer needs the Django ORM, this server is a standalone
 Python service — it does not need to run as a sidecar in the NetBox image.
@@ -79,3 +89,10 @@ it to GHCR. The server deployment then references the published tag.
 Data client and schemas implemented: REST-only, branch-first writes,
 per-user token pass-through, Pydantic filter/payload schemas + copied
 NetBox choices in `schemas/`. Tools are still to be implemented.
+
+Object coverage so far is DCIM + IPAM only (`site`, `device`,
+`device_role`, `device_type`, `manufacturer`, `interface`, `cable`,
+`rack`, `ip_address`, `prefix`, `vlan`, `vrf`), with read filter schemas
+for five of those and write schemas for three. Target is full NetBox
+object coverage — see "Approach" above and [OBJECT_COVERAGE.md](OBJECT_COVERAGE.md)
+for the object-by-object tracker.

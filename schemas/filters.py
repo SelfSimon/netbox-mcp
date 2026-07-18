@@ -4,9 +4,10 @@ Each field maps 1:1 to a NetBox REST API filter query parameter — no
 translation happens here or in client/rest.py (`list()` forwards filters
 as-is to NetBox). `to_params()` drops unset fields so only filters the
 caller actually supplied are sent, matching NetBox's own "unfiltered means
-all" default. Scope is the five resources prioritized for the read tools
-(site, device, interface, ip_address, vlan); other registered resources
-can get a filter schema the same way when their read tool is added.
+all" default. Currently covers site, device, interface, ip_address, and
+vlan — the first slice of read tools. Every other NetBox resource gets a
+filter schema the same way as its read tool is added, working toward full
+object coverage (see `client/registry.py`).
 """
 
 from __future__ import annotations

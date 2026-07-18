@@ -6,9 +6,12 @@ client/rest.py's `patch()` (partial update). NetBox is still the final
 authority regardless of what passes validation here — invalid values raise
 NetBoxValidationError from the client, not from these schemas.
 
-Scope covers device create/update, interface create/update, and IP
-address assignment. VLAN and site have no write tool planned yet, so no
-write schema for them here (see filters.py for their read-side schemas).
+Currently covers device create/update, interface create/update, and IP
+address assignment — the first slice of write tools. VLAN, site, and
+every other NetBox resource get a write schema the same way as their
+write tool is added; the goal is full read/write coverage of the NetBox
+object model, with NetBox's own per-user permissions (not this schema
+layer) as the actual access boundary.
 """
 
 from __future__ import annotations
