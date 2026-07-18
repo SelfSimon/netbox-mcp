@@ -76,5 +76,6 @@ it to GHCR. The server deployment then references the published tag.
 
 ## Status
 
-Data client implemented: REST-only, branch-first writes, per-user token
-pass-through. Schemas and tools are still to be implemented.
+Data client and schemas implemented: REST-only, branch-first writes,
+per-user token pass-through, Pydantic filter/payload schemas + copied
+NetBox choices in `schemas/`. Tools are still to be implemented.
