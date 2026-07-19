@@ -88,11 +88,14 @@ it to GHCR. The server deployment then references the published tag.
 
 Data client and schemas implemented: REST-only, branch-first writes,
 per-user token pass-through, Pydantic filter/payload schemas + copied
-NetBox choices in `schemas/`. Tools are still to be implemented.
+NetBox choices in `schemas/`. Read tools are implemented for site, device,
+interface, ip_address, and vlan (`list_*`/`get_*` in `tools/read.py`,
+registered on the MCP server in `src/netbox_mcp/server.py`). Write tools
+(create/update, branch management) are still to be implemented.
 
 Object coverage so far is DCIM + IPAM only (`site`, `device`,
 `device_role`, `device_type`, `manufacturer`, `interface`, `cable`,
 `rack`, `ip_address`, `prefix`, `vlan`, `vrf`), with read filter schemas
-for five of those and write schemas for three. Target is full NetBox
-object coverage — see "Approach" above and [OBJECT_COVERAGE.md](OBJECT_COVERAGE.md)
-for the object-by-object tracker.
+and read tools for five of those, and write schemas for three. Target is
+full NetBox object coverage — see "Approach" above and
+[OBJECT_COVERAGE.md](OBJECT_COVERAGE.md) for the object-by-object tracker.

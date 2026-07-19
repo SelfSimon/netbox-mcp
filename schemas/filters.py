@@ -23,7 +23,17 @@ class _FilterBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     def to_params(self) -> dict[str, Any]:
-        return self.model_dump(exclude_none=True)
+        """Dump to query-param-ready primitives.
+
+        `mode="json"` matters here: status fields are `str, Enum` members,
+        and a plain (Python-mode) dump leaves the enum member itself in the
+        dict. httpx's query-param encoder calls `str()` on values, and
+        `str()` on a mixed-in `str, Enum` member returns "ClassName.MEMBER"
+        (e.g. "DeviceStatus.ACTIVE"), not its string value — silently
+        sending a filter NetBox doesn't recognize. `mode="json"` dumps
+        enums to their plain value instead.
+        """
+        return self.model_dump(exclude_none=True, mode="json")
 
 
 class SiteFilter(_FilterBase):

@@ -41,6 +41,18 @@ All notable changes to this project will be documented in this file.
   Integration test suite (`tests/integration/`) exercising the same
   surface against a real NetBox instance, skipped automatically when
   `NETBOX_URL`/`NETBOX_API_TOKEN` aren't set.
+- First read tools (`tools/read.py`): `list_*`/`get_*` for site, device,
+  interface, ip_address, and vlan, registered on the MCP server in
+  `src/netbox_mcp/server.py`. Each tool builds its own `NetBoxRestClient`
+  from the calling user's own token (`netbox_mcp.auth.get_current_token`),
+  never the shared service account.
+
+### Fixed
+
+- `schemas/filters.py`'s `to_params()` serialized `status` filters (`str,
+  Enum` members) to `"DeviceStatus.ACTIVE"` instead of `"active"` in query
+  params, silently sending NetBox a filter it doesn't recognize. Fixed by
+  dumping with `mode="json"`.
 
 ### Changed
 

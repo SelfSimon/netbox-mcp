@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from netbox_mcp.auth import TokenCaptureMiddleware
+from tools.read import register as register_read_tools
 
 load_dotenv()
 
@@ -25,10 +26,9 @@ mcp = FastMCP(
     port=MCP_PORT,
 )
 
+register_read_tools(mcp)
 
-# TODO: register the read tools (devices, interfaces, IP, VLAN, sites)
 # TODO: register the write tools (create/update, branch management)
-# TODO: wire up the data client (client/)
 #
 # Handlers build their NetBoxRestClient from netbox_mcp.auth.get_current_token()
 # (the caller's own NetBox token, passed through per request), not from a

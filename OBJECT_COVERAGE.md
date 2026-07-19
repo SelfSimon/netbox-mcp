@@ -19,14 +19,14 @@ decisions.
   REST CRUD available to the data client)
 - **Read filter**: Pydantic filter schema in `schemas/filters.py`
 - **Write schema**: Pydantic create/update payload(s) in `schemas/writes.py`
-- **Tool**: MCP tool exposed in `tools/` (none exist yet for any object —
-  see README "Status")
+- **Tool**: MCP tool exposed in `tools/` — read tools (`list_*`/`get_*`)
+  only so far, see README "Status"; write tools are still to come
 
 ## DCIM
 
 | Object | REST endpoint | Registry | Read filter | Write schema | Tool |
 |---|---|---|---|---|---|
-| Site | `dcim/sites/` | ✅ | ✅ | ⬜ | ⬜ |
+| Site | `dcim/sites/` | ✅ | ✅ | ⬜ | ✅ |
 | Region | `dcim/regions/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Site group | `dcim/site-groups/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Location | `dcim/locations/` | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -39,7 +39,7 @@ decisions.
 | Module type | `dcim/module-types/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Device role | `dcim/device-roles/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Platform | `dcim/platforms/` | ⬜ | ⬜ | ⬜ | ⬜ |
-| Device | `dcim/devices/` | ✅ | ✅ | ✅ | ⬜ |
+| Device | `dcim/devices/` | ✅ | ✅ | ✅ | ✅ |
 | Module | `dcim/modules/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Virtual chassis | `dcim/virtual-chassis/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Virtual device context | `dcim/virtual-device-contexts/` | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -47,7 +47,7 @@ decisions.
 | Module bay | `dcim/module-bays/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Inventory item | `dcim/inventory-items/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Inventory item role | `dcim/inventory-item-roles/` | ⬜ | ⬜ | ⬜ | ⬜ |
-| Interface | `dcim/interfaces/` | ✅ | ✅ | ✅ | ⬜ |
+| Interface | `dcim/interfaces/` | ✅ | ✅ | ✅ | ✅ |
 | MAC address | `dcim/mac-addresses/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Console port | `dcim/console-ports/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Console server port | `dcim/console-server-ports/` | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -71,8 +71,8 @@ decisions.
 | IPAM role | `ipam/roles/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | Prefix | `ipam/prefixes/` | ✅ | ⬜ | ⬜ | ⬜ |
 | IP range | `ipam/ip-ranges/` | ⬜ | ⬜ | ⬜ | ⬜ |
-| IP address | `ipam/ip-addresses/` | ✅ | ✅ | ✅ | ⬜ |
-| VLAN | `ipam/vlans/` | ✅ | ✅ | ⬜ | ⬜ |
+| IP address | `ipam/ip-addresses/` | ✅ | ✅ | ✅ | ✅ |
+| VLAN | `ipam/vlans/` | ✅ | ✅ | ⬜ | ✅ |
 | VLAN group | `ipam/vlan-groups/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | ASN | `ipam/asns/` | ⬜ | ⬜ | ⬜ | ⬜ |
 | ASN range | `ipam/asn-ranges/` | ⬜ | ⬜ | ⬜ | ⬜ |
