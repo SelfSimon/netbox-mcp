@@ -48,6 +48,11 @@ All notable changes to this project will be documented in this file.
   never the shared service account. Registered with `readOnlyHint`/
   `idempotentHint` MCP annotations so clients can treat them as safe to
   call freely.
+- Integration tests for the read tools (`tests/integration/test_read_tools_integration.py`),
+  verified against a real NetBox 4.6.2 + `netbox_branching` 1.0.3 instance:
+  list/get round trips, not-found handling, and a regression test proving
+  `SiteFilter(status=...)` is actually honored by NetBox (catches the
+  `to_params()` enum-serialization bug below if it ever comes back).
 
 ### Fixed
 
