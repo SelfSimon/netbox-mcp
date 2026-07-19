@@ -5,7 +5,7 @@ title: "Couverture des objets"
 
 # Object coverage
 
-Tracks progress toward the project goal stated in [README.md](README.md):
+Tracks progress toward the project goal stated in [README.md](https://github.com/SelfSimon/netbox-mcp/blob/main/README.md):
 every NetBox object type reachable over the REST API should eventually be
 usable through MCP. Access control is NetBox's own per-user permissions
 (pass-through token, see `src/netbox_mcp/auth.py`), not a restriction
