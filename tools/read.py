@@ -2,7 +2,7 @@
 vlan — the first slice of read tools, matching the resources covered by
 `schemas/filters.py` and `client/registry.py`'s DCIM + IPAM slice. Every
 other registered resource gets a matching pair the same way, as its filter
-schema is added (see OBJECT_COVERAGE.md).
+schema is added (see docs/OBJECT_COVERAGE.md).
 
 Each tool builds its own `NetBoxRestClient` from the calling user's own
 token (`netbox_mcp.auth.get_current_token`), never a shared service

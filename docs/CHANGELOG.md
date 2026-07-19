@@ -95,7 +95,7 @@ All notable changes to this project will be documented in this file.
   matching, and the registry itself grew from 12 to ~132 resources across
   DCIM, IPAM, virtualization, circuits, tenancy, wireless, VPN, extras, and
   users/core. Registered on the MCP server alongside the read/write tools
-  in `src/netbox_mcp/server.py`. See `OBJECT_COVERAGE.md` for the
+  in `src/netbox_mcp/server.py`. See `docs/OBJECT_COVERAGE.md` for the
   object-by-object tracker of what's covered generically vs. by a
   dedicated tool.
 

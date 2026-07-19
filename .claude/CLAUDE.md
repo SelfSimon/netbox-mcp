@@ -74,4 +74,4 @@
   `client/registry.py` is reachable generically via `tools/generic.py`
   (`search_resources`/`get_resource`/`write_resource` — no per-object
   Pydantic schema, NetBox's own REST API validates). Check
-  `OBJECT_COVERAGE.md` before assuming a resource has a dedicated tool.
+  `docs/OBJECT_COVERAGE.md` before assuming a resource has a dedicated tool.

@@ -8,7 +8,7 @@ warrant precise schemas and per-action MCP annotations; every other
 resource registered in `client/registry.py` (the long tail: rack, cable,
 vrf, prefix, tenant, circuit, ...) is reachable through the three tools
 below instead of a new dedicated tool per object type. See
-OBJECT_COVERAGE.md for what's covered which way.
+docs/OBJECT_COVERAGE.md for what's covered which way.
 """
 
 from __future__ import annotations

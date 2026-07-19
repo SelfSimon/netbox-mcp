@@ -82,7 +82,9 @@ docker build -t netbox-mcp:dev .
 
 A Git tag (`vX.Y.Z`) triggers the GitHub Actions CI
 (`.github/workflows/build-publish.yml`), which builds the image and publishes
-it to GHCR. The server deployment then references the published tag.
+it to GHCR. The server deployment then references the published tag. See
+[docs/RELEASING.md](https://github.com/SelfSimon/netbox-mcp/blob/main/docs/RELEASING.md)
+for the full release procedure.
 
 ## Status
 
@@ -104,5 +106,6 @@ tools instead of a dedicated one per object: `search_resources`,
 `get_resource`, and `write_resource` (`tools/generic.py`). A resource only
 graduates to a dedicated tool once it's high-usage enough to warrant a
 precise Pydantic schema and per-action MCP annotations — see
-[OBJECT_COVERAGE.md](OBJECT_COVERAGE.md) for the object-by-object tracker
-and the "Approach" section above for the rationale.
+[docs/OBJECT_COVERAGE.md](https://github.com/SelfSimon/netbox-mcp/blob/main/docs/OBJECT_COVERAGE.md)
+for the object-by-object tracker and the "Approach" section above for the
+rationale.

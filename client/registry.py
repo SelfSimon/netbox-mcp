@@ -13,7 +13,7 @@ enough to make it usable through the generic `search_resources`/
 only needs a dedicated tool (`tools/read.py`/`tools/write.py`) and Pydantic
 schemas once it's high-usage enough to warrant precise validation and
 per-action MCP annotations (currently: site, device, interface, ip_address,
-vlan). See OBJECT_COVERAGE.md for tracking.
+vlan). See docs/OBJECT_COVERAGE.md for tracking.
 """
 
 from __future__ import annotations
