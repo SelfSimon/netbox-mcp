@@ -1,3 +1,8 @@
+<!--
+confluence-sync: true
+title: "Couverture des objets"
+-->
+
 # Object coverage
 
 Tracks progress toward the project goal stated in [README.md](README.md):

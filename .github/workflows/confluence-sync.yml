@@ -1,0 +1,54 @@
+name: Sync Confluence docs
+
+on:
+  push:
+    branches: [main, development]
+    paths:
+      - "**.md"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: confluence
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Any markdown file becomes a sync target just by adding a
+      # `confluence-sync: true` front-matter header — no workflow edit
+      # needed to add or remove a synced doc.
+      - name: Find markdown files with a Confluence sync header
+        id: files
+        run: |
+          files=$(grep -rl '^confluence-sync: true$' --include='*.md' . | sed 's|^\./||' || true)
+          echo "Found: ${files:-none}"
+          {
+            echo "files<<EOF"
+            echo "$files"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sync to Confluence
+        if: steps.files.outputs.files != ''
+        env:
+          # Scoped-token / service-account auth against the Atlassian API
+          # gateway (https://api.atlassian.com/ex/confluence/<CLOUD_ID>/),
+          # not the classic domain + username Basic Auth mode.
+          CONFLUENCE_API_URL: ${{ secrets.CONFLUENCE_API_URL }}
+          CONFLUENCE_API_KEY: ${{ secrets.CONFLUENCE_BOT_TOKEN }}
+          CONFLUENCE_SPACE_KEY: ${{ secrets.CONFLUENCE_SPACE_KEY }}
+        run: |
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            echo "> Sync $file"
+            docker run --rm \
+              -v "$PWD":/data -w /data \
+              -e CONFLUENCE_API_URL -e CONFLUENCE_API_KEY -e CONFLUENCE_SPACE_KEY \
+              leventehunyadi/md2conf:latest \
+              "$file" \
+              --root-page "${{ secrets.CONFLUENCE_ROOT_PAGE_ID }}" \
+              --render-mermaid
+          done <<< "${{ steps.files.outputs.files }}"
