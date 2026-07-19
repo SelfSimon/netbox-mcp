@@ -101,6 +101,13 @@ def write_resource(
     tool. `data` is the raw NetBox REST payload — there's no Pydantic
     validation here, NetBox's own API validates and reports errors.
     `object_id` is required for update/patch/delete.
+
+    `action="update"` is a full replacement (HTTP PUT): `data` must
+    include every required field of the object, not just the ones you're
+    changing — NetBox rejects a PUT that omits a required field, even if
+    that field's value wouldn't change. To change only some fields, use
+    `action="patch"` (HTTP PATCH) instead; it only needs the fields you
+    want to modify. When in doubt, prefer `patch`.
     """
     _validate_resource(resource)
     if action != "create" and object_id is None:

@@ -167,9 +167,10 @@ class NetBoxRestClient:
         if response.status_code == 404:
             raise NetBoxNotFoundError(f"{method} {path}: object not found")
         if response.status_code == 400:
+            errors = _safe_json(response)
             raise NetBoxValidationError(
-                f"{method} {path}: data rejected by NetBox",
-                errors=_safe_json(response),
+                f"{method} {path}: data rejected by NetBox: {errors}",
+                errors=errors,
             )
         if response.status_code == 429:
             raise NetBoxConnectionError(
