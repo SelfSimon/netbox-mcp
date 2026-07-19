@@ -19,8 +19,10 @@ decisions.
   REST CRUD available to the data client)
 - **Read filter**: Pydantic filter schema in `schemas/filters.py`
 - **Write schema**: Pydantic create/update payload(s) in `schemas/writes.py`
-- **Tool**: MCP tool exposed in `tools/` — read tools (`list_*`/`get_*`)
-  only so far, see README "Status"; write tools are still to come
+- **Tool**: MCP tool exposed in `tools/` — read tools (`list_*`/`get_*`,
+  `tools/read.py`) for site/device/interface/ip_address/vlan, plus write
+  tools (create/update/assign, `tools/write.py`) for device, interface, and
+  IP address, see README "Status"
 
 ## DCIM
 
@@ -176,6 +178,8 @@ polled through dedicated helpers in `client/branches.py`
 (`create_branch`, `get_branch`, `list_branches`, `wait_until_ready`), and
 deliberately have no `merge()`/`sync()`/`revert()`/`archive()` — those stay
 a human action in the NetBox UI. See README "Approach" for the rationale.
+Branch creation and listing are exposed as MCP tools (`create_branch`,
+`list_branches` in `tools/write.py`) — merge is not, for the same reason.
 
 ## Updating this file
 

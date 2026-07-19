@@ -42,7 +42,7 @@ netbox-mcp/
 ├── src/netbox_mcp/   # server entry point (server.py) + auth pass-through (auth.py)
 ├── client/           # REST data client (rest.py) + branch helpers (branches.py)
 ├── schemas/          # Pydantic schemas + copied NetBox enums
-├── tools/            # read and write MCP tools (planned)
+├── tools/            # read and write MCP tools
 ├── Dockerfile         # standalone Python image
 ├── requirements.txt
 └── .env.example
@@ -91,11 +91,15 @@ per-user token pass-through, Pydantic filter/payload schemas + copied
 NetBox choices in `schemas/`. Read tools are implemented for site, device,
 interface, ip_address, and vlan (`list_*`/`get_*` in `tools/read.py`,
 registered on the MCP server in `src/netbox_mcp/server.py`). Write tools
-(create/update, branch management) are still to be implemented.
+are implemented for device and interface create/update, IP address
+assignment, and `netbox_branching` branch create/list (`tools/write.py`,
+same registration point) — every create/update tool requires an active
+branch, and merge stays a human-only action in the NetBox UI.
 
 Object coverage so far is DCIM + IPAM only (`site`, `device`,
 `device_role`, `device_type`, `manufacturer`, `interface`, `cable`,
 `rack`, `ip_address`, `prefix`, `vlan`, `vrf`), with read filter schemas
-and read tools for five of those, and write schemas for three. Target is
-full NetBox object coverage — see "Approach" above and
+and read tools for five of those, and write schemas + write tools for
+three (device, interface, ip_address). Target is full NetBox object
+coverage — see "Approach" above and
 [OBJECT_COVERAGE.md](OBJECT_COVERAGE.md) for the object-by-object tracker.

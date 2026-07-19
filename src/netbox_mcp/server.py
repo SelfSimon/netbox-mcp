@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 
 from netbox_mcp.auth import TokenCaptureMiddleware
 from tools.read import register as register_read_tools
+from tools.write import register as register_write_tools
 
 load_dotenv()
 
@@ -27,12 +28,7 @@ mcp = FastMCP(
 )
 
 register_read_tools(mcp)
-
-# TODO: register the write tools (create/update, branch management)
-#
-# Handlers build their NetBoxRestClient from netbox_mcp.auth.get_current_token()
-# (the caller's own NetBox token, passed through per request), not from a
-# shared service account token.
+register_write_tools(mcp)
 
 
 async def _run() -> None:

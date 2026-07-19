@@ -53,6 +53,24 @@ All notable changes to this project will be documented in this file.
   list/get round trips, not-found handling, and a regression test proving
   `SiteFilter(status=...)` is actually honored by NetBox (catches the
   `to_params()` enum-serialization bug below if it ever comes back).
+- Write tools (`tools/write.py`): `create_device`/`update_device`,
+  `create_interface`/`update_interface`, `assign_ip_address`, and
+  `netbox_branching` branch management (`create_branch`/`list_branches` —
+  deliberately no `merge_branch`, matching `client/branches.py`).
+  `create_device`/`create_interface`/`assign_ip_address`/`create_branch`
+  are registered with `destructiveHint=False`/`idempotentHint=False`
+  (each call creates a new object); `update_device`/`update_interface`
+  with `destructiveHint=True`/`idempotentHint=True` (in-place, repeatable
+  with the same result), so MCP clients can prompt for confirmation before
+  the mutating ones. Every create/update tool requires an active branch
+  (its `schema_id`, from `create_branch()`); nothing here ever writes to
+  `main` directly. Registered on the MCP server alongside the read tools
+  in `src/netbox_mcp/server.py`.
+- Unit tests (`tests/unit/test_write_tools.py`, mocked) and integration
+  tests (`tests/integration/test_write_tools_integration.py`, against a
+  real NetBox instance) for the write tools: create/update round trips
+  scoped to a branch, branch invisibility from `main`, not-found handling,
+  and the branch create/list tools themselves.
 
 ### Fixed
 
