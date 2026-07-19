@@ -71,6 +71,14 @@ All notable changes to this project will be documented in this file.
   real NetBox instance) for the write tools: create/update round trips
   scoped to a branch, branch invisibility from `main`, not-found handling,
   and the branch create/list tools themselves.
+- Branch-reuse guidance in every write tool's docstring (`tools/write.py`):
+  `create_branch()` now explicitly instructs callers to create one branch
+  per logical task and reuse its `schema_id` across every related write,
+  and to check `list_branches()` for an existing ready branch first —
+  addresses branch proliferation observed when each write in a multi-step
+  task created its own branch (15 branches from one integration test run).
+  Stateless (docstrings only, no new server-side session state); see the
+  design notes for a stateful follow-up option if this proves insufficient.
 
 ### Fixed
 

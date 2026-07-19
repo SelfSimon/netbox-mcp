@@ -43,21 +43,32 @@ def _client(branch: str | None = None) -> NetBoxRestClient:
 def create_device(payload: DeviceCreate, branch: str) -> dict[str, Any]:
     """Create a device inside a netbox_branching branch.
 
-    `branch` is the schema_id of an active branch, as returned by
-    create_branch().
+    `branch` should be the schema_id you already obtained from
+    create_branch() for this task — reuse the same branch across every
+    related write, don't create a new one per call.
     """
     with _client(branch) as client:
         return client.create("device", payload.to_payload())
 
 
 def update_device(device_id: int, payload: DeviceUpdate, branch: str) -> dict[str, Any]:
-    """Partially update a device inside a netbox_branching branch."""
+    """Partially update a device inside a netbox_branching branch.
+
+    `branch` should be the schema_id you already obtained from
+    create_branch() for this task — reuse the same branch across every
+    related write, don't create a new one per call.
+    """
     with _client(branch) as client:
         return client.patch("device", device_id, payload.to_payload())
 
 
 def create_interface(payload: InterfaceCreate, branch: str) -> dict[str, Any]:
-    """Create a device interface inside a netbox_branching branch."""
+    """Create a device interface inside a netbox_branching branch.
+
+    `branch` should be the schema_id you already obtained from
+    create_branch() for this task — reuse the same branch across every
+    related write, don't create a new one per call.
+    """
     with _client(branch) as client:
         return client.create("interface", payload.to_payload())
 
@@ -65,20 +76,40 @@ def create_interface(payload: InterfaceCreate, branch: str) -> dict[str, Any]:
 def update_interface(
     interface_id: int, payload: InterfaceUpdate, branch: str
 ) -> dict[str, Any]:
-    """Partially update a device interface inside a netbox_branching branch."""
+    """Partially update a device interface inside a netbox_branching branch.
+
+    `branch` should be the schema_id you already obtained from
+    create_branch() for this task — reuse the same branch across every
+    related write, don't create a new one per call.
+    """
     with _client(branch) as client:
         return client.patch("interface", interface_id, payload.to_payload())
 
 
 def assign_ip_address(payload: IPAddressAssign, branch: str) -> dict[str, Any]:
     """Create an IP address already assigned to an interface, inside a
-    netbox_branching branch."""
+    netbox_branching branch.
+
+    `branch` should be the schema_id you already obtained from
+    create_branch() for this task — reuse the same branch across every
+    related write, don't create a new one per call.
+    """
     with _client(branch) as client:
         return client.create("ip_address", payload.to_payload())
 
 
 def create_branch(name: str, description: str = "") -> dict[str, Any]:
     """Create a netbox_branching branch and wait for it to become ready.
+
+    Call this ONCE per logical task or change-set, not once per write. If
+    you are about to make several related writes (e.g. "add these 3
+    devices", "create a device and its interfaces and IP"), create a
+    single branch here, then pass its `schema_id` to every create_device /
+    update_device / create_interface / update_interface / assign_ip_address
+    call in that task. Creating a new branch per individual write causes
+    branch proliferation that a human then has to clean up in the NetBox
+    UI — check list_branches() first for an existing "ready"-status branch
+    from this task before calling this again.
 
     Returns the ready branch object; its `schema_id` is the `branch`
     argument the other write tools need. Merging, syncing, reverting, or
@@ -91,7 +122,12 @@ def create_branch(name: str, description: str = "") -> dict[str, Any]:
 
 
 def list_branches() -> list[dict[str, Any]]:
-    """List netbox_branching branches."""
+    """List netbox_branching branches.
+
+    Before calling create_branch(), check here for an existing
+    "ready"-status branch you already created for the current task, and
+    reuse its schema_id instead of creating a new one.
+    """
     with _client() as client:
         return branch_client.list_branches(client)
 
