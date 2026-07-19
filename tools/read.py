@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
+from mcp.types import ToolAnnotations
+
 from client.config import get_settings
 from client.rest import NetBoxRestClient
 from netbox_mcp.auth import get_current_token
@@ -110,7 +112,10 @@ _READ_TOOLS = (
 )
 
 
+_READ_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
+
+
 def register(mcp: "FastMCP") -> None:
     """Register every read tool on `mcp`."""
     for fn in _READ_TOOLS:
-        mcp.add_tool(fn)
+        mcp.add_tool(fn, annotations=_READ_ANNOTATIONS)

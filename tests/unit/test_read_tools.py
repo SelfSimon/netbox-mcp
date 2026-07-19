@@ -173,3 +173,7 @@ def test_register_adds_all_read_tools():
         "list_vlans",
         "get_vlan",
     }
+    assert all(
+        tool.annotations.readOnlyHint and tool.annotations.idempotentHint
+        for tool in mcp._tool_manager.list_tools()
+    )

@@ -45,7 +45,9 @@ All notable changes to this project will be documented in this file.
   interface, ip_address, and vlan, registered on the MCP server in
   `src/netbox_mcp/server.py`. Each tool builds its own `NetBoxRestClient`
   from the calling user's own token (`netbox_mcp.auth.get_current_token`),
-  never the shared service account.
+  never the shared service account. Registered with `readOnlyHint`/
+  `idempotentHint` MCP annotations so clients can treat them as safe to
+  call freely.
 
 ### Fixed
 
