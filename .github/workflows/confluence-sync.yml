@@ -50,5 +50,6 @@ jobs:
               leventehunyadi/md2conf:latest \
               "$file" \
               --root-page "${{ secrets.CONFLUENCE_ROOT_PAGE_ID }}" \
-              --render-mermaid
+              --render-mermaid \
+              --skip-update
           done <<< "${{ steps.files.outputs.files }}"
