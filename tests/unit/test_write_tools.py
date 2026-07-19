@@ -1,5 +1,7 @@
+import asyncio
+
 import httpx
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from client.config import ClientSettings
 from client.rest import BRANCH_HEADER, NetBoxRestClient
@@ -168,7 +170,7 @@ def test_register_adds_all_write_tools():
 
     write.register(mcp)
 
-    tool_names = {tool.name for tool in mcp._tool_manager.list_tools()}
+    tool_names = {tool.name for tool in asyncio.run(mcp.list_tools())}
     assert tool_names == {
         "create_device",
         "update_device",
@@ -183,7 +185,7 @@ def test_register_adds_all_write_tools():
 def test_create_tools_are_not_destructive_and_not_idempotent():
     mcp = FastMCP(name="test")
     write.register(mcp)
-    tools_by_name = {t.name: t for t in mcp._tool_manager.list_tools()}
+    tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
     for name in (
         "create_device",
@@ -198,7 +200,7 @@ def test_create_tools_are_not_destructive_and_not_idempotent():
 def test_update_tools_are_destructive_and_idempotent():
     mcp = FastMCP(name="test")
     write.register(mcp)
-    tools_by_name = {t.name: t for t in mcp._tool_manager.list_tools()}
+    tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
     for name in ("update_device", "update_interface"):
         assert tools_by_name[name].annotations.destructiveHint is True
@@ -208,7 +210,7 @@ def test_update_tools_are_destructive_and_idempotent():
 def test_list_branches_is_read_only():
     mcp = FastMCP(name="test")
     write.register(mcp)
-    tools_by_name = {t.name: t for t in mcp._tool_manager.list_tools()}
+    tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
     assert tools_by_name["list_branches"].annotations.readOnlyHint is True
     assert tools_by_name["list_branches"].annotations.idempotentHint is True

@@ -20,6 +20,9 @@
   type; `choices.py` has hand-copied NetBox enums.
 - `tools/read.py` / `tools/write.py` — MCP tool defs; writes always require
   a `branch` param routed via `X-NetBox-Branch`; reads always target `main`.
+- `tools/generic.py` — `search_resources`/`get_resource`/`write_resource`,
+  covering every resource in `client/registry.py` that has no dedicated
+  tool; same `branch`/`main` rules as above.
 - `src/netbox_mcp/auth.py` — per-request NetBox token pass-through
   (Starlette middleware + `ContextVar`), not full OAuth.
 
@@ -64,8 +67,9 @@
 - `netbox_branching` branches are write-only from MCP: no `merge()`/`sync()`/
   `revert()`/`archive()` by design — merging into `main` is a human action in
   the NetBox UI. Do not add these.
-- Only 5 of 12 registered resources (site, device, interface, ip_address,
-  vlan) have schemas + tools; rack, manufacturer, device_type, device_role,
-  cable, vrf, prefix are registry-only (`client/registry.py`) with no
-  read/write tool yet. Check `OBJECT_COVERAGE.md` before assuming a resource
-  is usable end-to-end.
+- Only 5 of ~130 registered resources (site, device, interface, ip_address,
+  vlan) have dedicated schemas + tools; everything else in
+  `client/registry.py` is reachable generically via `tools/generic.py`
+  (`search_resources`/`get_resource`/`write_resource` — no per-object
+  Pydantic schema, NetBox's own REST API validates). Check
+  `OBJECT_COVERAGE.md` before assuming a resource has a dedicated tool.

@@ -1,5 +1,7 @@
+import asyncio
+
 import httpx
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from client.config import ClientSettings
 from client.rest import NetBoxRestClient
@@ -160,7 +162,8 @@ def test_register_adds_all_read_tools():
 
     read.register(mcp)
 
-    tool_names = {tool.name for tool in mcp._tool_manager.list_tools()}
+    tools = asyncio.run(mcp.list_tools())
+    tool_names = {tool.name for tool in tools}
     assert tool_names == {
         "list_sites",
         "get_site",
@@ -175,5 +178,5 @@ def test_register_adds_all_read_tools():
     }
     assert all(
         tool.annotations.readOnlyHint and tool.annotations.idempotentHint
-        for tool in mcp._tool_manager.list_tools()
+        for tool in tools
     )

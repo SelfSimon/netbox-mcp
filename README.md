@@ -88,18 +88,21 @@ it to GHCR. The server deployment then references the published tag.
 
 Data client and schemas implemented: REST-only, branch-first writes,
 per-user token pass-through, Pydantic filter/payload schemas + copied
-NetBox choices in `schemas/`. Read tools are implemented for site, device,
-interface, ip_address, and vlan (`list_*`/`get_*` in `tools/read.py`,
-registered on the MCP server in `src/netbox_mcp/server.py`). Write tools
-are implemented for device and interface create/update, IP address
-assignment, and `netbox_branching` branch create/list (`tools/write.py`,
-same registration point) — every create/update tool requires an active
-branch, and merge stays a human-only action in the NetBox UI.
+NetBox choices in `schemas/`. Dedicated read tools are implemented for
+site, device, interface, ip_address, and vlan (`list_*`/`get_*` in
+`tools/read.py`, registered on the MCP server in
+`src/netbox_mcp/server.py`). Dedicated write tools are implemented for
+device and interface create/update, IP address assignment, and
+`netbox_branching` branch create/list (`tools/write.py`, same
+registration point) — every create/update tool requires an active branch,
+and merge stays a human-only action in the NetBox UI.
 
-Object coverage so far is DCIM + IPAM only (`site`, `device`,
-`device_role`, `device_type`, `manufacturer`, `interface`, `cable`,
-`rack`, `ip_address`, `prefix`, `vlan`, `vrf`), with read filter schemas
-and read tools for five of those, and write schemas + write tools for
-three (device, interface, ip_address). Target is full NetBox object
-coverage — see "Approach" above and
-[OBJECT_COVERAGE.md](OBJECT_COVERAGE.md) for the object-by-object tracker.
+Every other NetBox object type registered in `client/registry.py`
+(~130 resources across DCIM, IPAM, virtualization, circuits, tenancy,
+wireless, VPN, extras, and users/core) is reachable through three generic
+tools instead of a dedicated one per object: `search_resources`,
+`get_resource`, and `write_resource` (`tools/generic.py`). A resource only
+graduates to a dedicated tool once it's high-usage enough to warrant a
+precise Pydantic schema and per-action MCP annotations — see
+[OBJECT_COVERAGE.md](OBJECT_COVERAGE.md) for the object-by-object tracker
+and the "Approach" section above for the rationale.

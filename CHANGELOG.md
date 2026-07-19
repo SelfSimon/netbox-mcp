@@ -79,6 +79,25 @@ All notable changes to this project will be documented in this file.
   task created its own branch (15 branches from one integration test run).
   Stateless (docstrings only, no new server-side session state); see the
   design notes for a stateful follow-up option if this proves insufficient.
+- Generic search+execute tools (`tools/generic.py`): `search_resources`,
+  `get_resource`, and `write_resource` cover every resource registered in
+  `client/registry.py` that has no dedicated tool — no per-object Pydantic
+  schema needed, since `client/rest.py`'s `list()`/`get()`/`create()`/
+  `update()`/`patch()`/`delete()` are already resource-name-generic and
+  NetBox's own REST API validates payloads server-side. Split into three
+  tools rather than the more common two-tool `search_actions`/
+  `execute_action` template so read tools can carry accurate
+  `readOnlyHint=True` and the write tool `destructiveHint=True`, matching
+  this repo's existing per-action annotation convention. `write_resource`
+  requires an active `branch`, same rule as every dedicated write tool.
+  `client/registry.py`'s `ModelSpec` gained a `label` field (NetBox's
+  human-readable object name) to back `search_resources()`'s substring
+  matching, and the registry itself grew from 12 to ~132 resources across
+  DCIM, IPAM, virtualization, circuits, tenancy, wireless, VPN, extras, and
+  users/core. Registered on the MCP server alongside the read/write tools
+  in `src/netbox_mcp/server.py`. See `OBJECT_COVERAGE.md` for the
+  object-by-object tracker of what's covered generically vs. by a
+  dedicated tool.
 
 ### Fixed
 
@@ -101,3 +120,15 @@ All notable changes to this project will be documented in this file.
   permission bug (`.all()` instead of `.restrict(user, action)`). See the
   "Architecture" and "Décisions de cadrage" documentation for the full
   rationale.
+- Migrated from `mcp.server.fastmcp.FastMCP` (the frozen FastMCP 1.0 bundled
+  in the official `mcp` SDK) to the actively-developed standalone `fastmcp`
+  3.x package. `tools/read.py`/`tools/write.py` now build annotated tools
+  via `fastmcp.tools.Tool.from_function(fn, annotations=...)` before calling
+  `mcp.add_tool(tool)` — 3.x's `add_tool()` no longer takes an `annotations`
+  kwarg directly. `server.py` builds the ASGI app via
+  `mcp.http_app(middleware=[...])` instead of `streamable_http_app()` +
+  `add_middleware()`, and no longer passes `host`/`port` to the `FastMCP`
+  constructor (moved to the `uvicorn.Config` call, unchanged). Unit tests
+  updated to use the new async `mcp.list_tools()` in place of the removed
+  private `mcp._tool_manager.list_tools()`. The `mcp` SDK dependency is kept
+  for `mcp.types.ToolAnnotations`.

@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
+from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 
 from client import branches as branch_client
@@ -32,7 +33,7 @@ from schemas.writes import (
 )
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp import FastMCP
+    from fastmcp import FastMCP
 
 
 def _client(branch: str | None = None) -> NetBoxRestClient:
@@ -150,4 +151,4 @@ _WRITE_TOOLS = (
 def register(mcp: "FastMCP") -> None:
     """Register every write tool on `mcp`."""
     for fn, tool_annotations in _WRITE_TOOLS:
-        mcp.add_tool(fn, annotations=tool_annotations)
+        mcp.add_tool(Tool.from_function(fn, annotations=tool_annotations))

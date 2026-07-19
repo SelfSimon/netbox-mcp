@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
+from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 
 from client.config import get_settings
@@ -30,7 +31,7 @@ from schemas.filters import (
 )
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp import FastMCP
+    from fastmcp import FastMCP
 
 
 def _client() -> NetBoxRestClient:
@@ -118,4 +119,4 @@ _READ_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
 def register(mcp: "FastMCP") -> None:
     """Register every read tool on `mcp`."""
     for fn in _READ_TOOLS:
-        mcp.add_tool(fn, annotations=_READ_ANNOTATIONS)
+        mcp.add_tool(Tool.from_function(fn, annotations=_READ_ANNOTATIONS))

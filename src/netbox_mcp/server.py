@@ -10,9 +10,11 @@ import os
 import anyio
 import uvicorn
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
+from starlette.middleware import Middleware
 
 from netbox_mcp.auth import TokenCaptureMiddleware
+from tools.generic import register as register_generic_tools
 from tools.read import register as register_read_tools
 from tools.write import register as register_write_tools
 
@@ -21,14 +23,11 @@ load_dotenv()
 MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.environ.get("MCP_PORT", "8765"))
 
-mcp = FastMCP(
-    name="netbox-mcp",
-    host=MCP_HOST,
-    port=MCP_PORT,
-)
+mcp = FastMCP(name="netbox-mcp")
 
 register_read_tools(mcp)
 register_write_tools(mcp)
+register_generic_tools(mcp)
 
 
 async def _run() -> None:
@@ -36,10 +35,8 @@ async def _run() -> None:
     # per the scoping decision (no public exposure).
     #
     # Not using mcp.run(): we need our own token-capture middleware on the
-    # ASGI app, so the app is built and served here instead, the same way
-    # FastMCP.run_streamable_http_async() does internally.
-    app = mcp.streamable_http_app()
-    app.add_middleware(TokenCaptureMiddleware)
+    # ASGI app, so the app is built and served here instead.
+    app = mcp.http_app(middleware=[Middleware(TokenCaptureMiddleware)])
 
     config = uvicorn.Config(app, host=MCP_HOST, port=MCP_PORT, log_level="info")
     server = uvicorn.Server(config)
