@@ -28,6 +28,8 @@
 
 ## Task tracking
 - Track all work items in Jira, project key `NETBOX`, under epic `NETBOX-78`.
+- When starting work on a ticket, transition it to "En cours"; when the
+  work is done (and, if applicable, pushed), transition it to "Terminé".
 
 ## Documentation
 - **Dev/design docs** (architecture, design decisions, RFCs): Confluence,
