@@ -30,17 +30,18 @@ def test_get_settings_reads_optional_overrides(monkeypatch):
     assert settings.max_retries == 0
 
 
-@pytest.mark.parametrize("missing_var", ["NETBOX_URL", "NETBOX_API_TOKEN"])
-def test_get_settings_raises_on_missing_variable(monkeypatch, missing_var):
-    values = {
-        "NETBOX_URL": "http://netbox.local",
-        "NETBOX_API_TOKEN": "abc123",
-    }
-    for name, value in values.items():
-        if name == missing_var:
-            monkeypatch.delenv(name, raising=False)
-        else:
-            monkeypatch.setenv(name, value)
+def test_get_settings_raises_on_missing_url(monkeypatch):
+    monkeypatch.delenv("NETBOX_URL", raising=False)
+    monkeypatch.setenv("NETBOX_API_TOKEN", "abc123")
 
     with pytest.raises(NetBoxConfigurationError):
         get_settings()
+
+
+def test_get_settings_defaults_token_when_missing(monkeypatch):
+    monkeypatch.setenv("NETBOX_URL", "http://netbox.local")
+    monkeypatch.delenv("NETBOX_API_TOKEN", raising=False)
+
+    settings = get_settings()
+
+    assert settings.netbox_api_token == ""

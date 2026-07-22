@@ -11,7 +11,7 @@ from .exceptions import NetBoxConfigurationError
 @dataclass(frozen=True)
 class ClientSettings:
     netbox_url: str
-    netbox_api_token: str
+    netbox_api_token: str = ""
     timeout: float = 10.0
     max_retries: int = 2
 
@@ -19,29 +19,21 @@ class ClientSettings:
 def get_settings() -> ClientSettings:
     """Read configuration from environment variables.
 
-    `netbox_api_token` here is the dev/test/CI fallback (service account).
-    In real MCP usage, each request builds its own `ClientSettings` from the
-    caller's personal NetBox token instead of calling this function — see
-    `netbox_mcp.auth`.
+    Only `NETBOX_URL` is required. `netbox_api_token` here is the dev/test/CI
+    fallback (service account) and defaults to "" when unset — real MCP
+    requests always overwrite it with the caller's personal NetBox token via
+    `netbox_mcp.auth.get_current_token`, which raises its own clear error if
+    neither a per-request token nor this fallback is available. Requiring
+    `NETBOX_API_TOKEN` here as well would raise before that per-request token
+    is ever considered.
 
-    Raises NetBoxConfigurationError if a required variable is missing.
+    Raises NetBoxConfigurationError if NETBOX_URL is missing.
     """
     netbox_url = os.environ.get("NETBOX_URL")
-    netbox_api_token = os.environ.get("NETBOX_API_TOKEN")
+    if not netbox_url:
+        raise NetBoxConfigurationError("Missing environment variable(s): NETBOX_URL")
 
-    missing = [
-        name
-        for name, value in (
-            ("NETBOX_URL", netbox_url),
-            ("NETBOX_API_TOKEN", netbox_api_token),
-        )
-        if not value
-    ]
-    if missing:
-        raise NetBoxConfigurationError(
-            f"Missing environment variable(s): {', '.join(missing)}"
-        )
-
+    netbox_api_token = os.environ.get("NETBOX_API_TOKEN", "")
     timeout = float(os.environ.get("NETBOX_CLIENT_TIMEOUT", "10.0"))
     max_retries = int(os.environ.get("NETBOX_CLIENT_MAX_RETRIES", "2"))
 
