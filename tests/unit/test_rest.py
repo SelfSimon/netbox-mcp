@@ -115,6 +115,29 @@ def test_list_follows_pagination():
     assert len(calls) == 2
 
 
+def test_list_with_explicit_limit_does_not_follow_pagination():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "count": 300,
+                "next": "http://netbox.local/api/dcim/devices/?limit=10&offset=10",
+                "previous": None,
+                "results": [{"id": i} for i in range(10)],
+            },
+        )
+
+    client = make_client(handler)
+
+    result = client.list("device", filters={"limit": 10})
+
+    assert len(result) == 10
+    assert len(calls) == 1
+
+
 def test_list_sends_filters_as_query_params():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.params["site"] == "dc1"

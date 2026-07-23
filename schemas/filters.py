@@ -8,6 +8,13 @@ all" default. Currently covers site, device, interface, ip_address, and
 vlan — the first slice of read tools. Every other NetBox resource gets a
 filter schema the same way as its read tool is added, working toward full
 object coverage (see `client/registry.py`).
+
+`_FilterBase` also carries `limit`/`offset`/`ordering`, shared by every
+filter below. `limit` defaults to 50 (rather than unset, like every other
+field) so a `list_*` call with no explicit limit still returns a bounded
+page instead of risking the 1MB MCP tool-result cap on large NetBox
+instances (see NETBOX-96); pass a bigger `limit`, or `0` for NetBox's own
+"no limit" convention, to opt out.
 """
 
 from __future__ import annotations
@@ -21,6 +28,10 @@ from .choices import DeviceStatus, IPAddressStatus, SiteStatus, VLANStatus
 
 class _FilterBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    limit: int | None = 50
+    offset: int | None = None
+    ordering: str | None = None
 
     def to_params(self) -> dict[str, Any]:
         """Dump to query-param-ready primitives.

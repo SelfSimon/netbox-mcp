@@ -35,9 +35,9 @@ def test_list_sites_sends_filters_as_query_params(monkeypatch):
     assert read.list_sites(SiteFilter(status="active")) == []
 
 
-def test_list_sites_defaults_to_no_filters_when_omitted(monkeypatch):
+def test_list_sites_defaults_to_limit_fifty_when_omitted(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
-        assert dict(request.url.params) == {}
+        assert dict(request.url.params) == {"limit": "50"}
         return httpx.Response(
             200, json={"count": 0, "next": None, "previous": None, "results": []}
         )

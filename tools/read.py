@@ -40,7 +40,12 @@ def _client() -> NetBoxRestClient:
 
 
 def list_sites(filters: SiteFilter | None = None) -> list[dict[str, Any]]:
-    """List NetBox sites, optionally narrowed by filters."""
+    """List NetBox sites, optionally narrowed by filters.
+
+    Defaults to the first 50 results; pass `limit`/`offset` to page
+    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
+    "-created") to sort.
+    """
     with _client() as client:
         return client.list("site", (filters or SiteFilter()).to_params())
 
@@ -52,7 +57,12 @@ def get_site(site_id: int) -> dict[str, Any]:
 
 
 def list_devices(filters: DeviceFilter | None = None) -> list[dict[str, Any]]:
-    """List NetBox devices, optionally narrowed by filters."""
+    """List NetBox devices, optionally narrowed by filters.
+
+    Defaults to the first 50 results; pass `limit`/`offset` to page
+    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
+    "-created") to sort.
+    """
     with _client() as client:
         return client.list("device", (filters or DeviceFilter()).to_params())
 
@@ -64,7 +74,12 @@ def get_device(device_id: int) -> dict[str, Any]:
 
 
 def list_interfaces(filters: InterfaceFilter | None = None) -> list[dict[str, Any]]:
-    """List NetBox device interfaces, optionally narrowed by filters."""
+    """List NetBox device interfaces, optionally narrowed by filters.
+
+    Defaults to the first 50 results; pass `limit`/`offset` to page
+    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
+    "-created") to sort.
+    """
     with _client() as client:
         return client.list("interface", (filters or InterfaceFilter()).to_params())
 
@@ -76,7 +91,12 @@ def get_interface(interface_id: int) -> dict[str, Any]:
 
 
 def list_ip_addresses(filters: IPAddressFilter | None = None) -> list[dict[str, Any]]:
-    """List NetBox IP addresses, optionally narrowed by filters."""
+    """List NetBox IP addresses, optionally narrowed by filters.
+
+    Defaults to the first 50 results; pass `limit`/`offset` to page
+    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
+    "-created") to sort.
+    """
     with _client() as client:
         return client.list("ip_address", (filters or IPAddressFilter()).to_params())
 
@@ -88,7 +108,12 @@ def get_ip_address(ip_address_id: int) -> dict[str, Any]:
 
 
 def list_vlans(filters: VLANFilter | None = None) -> list[dict[str, Any]]:
-    """List NetBox VLANs, optionally narrowed by filters."""
+    """List NetBox VLANs, optionally narrowed by filters.
+
+    Defaults to the first 50 results; pass `limit`/`offset` to page
+    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
+    "-created") to sort.
+    """
     with _client() as client:
         return client.list("vlan", (filters or VLANFilter()).to_params())
 

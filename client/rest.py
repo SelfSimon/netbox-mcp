@@ -83,15 +83,25 @@ class NetBoxRestClient:
     def list(
         self, resource: str, filters: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
-        """Return all objects matching `filters`, following pagination."""
+        """Return objects matching `filters`.
+
+        Auto-paginates through every page when `filters` has no explicit
+        `limit`. If it does, a single request is made and that page is
+        returned as-is: previously `next` was always followed regardless
+        of `limit`, so a caller-supplied limit was silently ignored and
+        the full result set came back anyway (NETBOX-96).
+        """
         spec = get_model_spec(resource)
         results: list[dict[str, Any]] = []
 
         response = self._request("GET", spec.rest_path, params=filters)
         payload = response.json()
         results.extend(payload["results"])
-        next_url = payload.get("next")
 
+        if filters and filters.get("limit") is not None:
+            return results
+
+        next_url = payload.get("next")
         while next_url:
             response = self._request("GET", next_url)
             payload = response.json()
