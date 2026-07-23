@@ -11,9 +11,11 @@
 ## Architecture
 - `client/registry.py` — NetBox object type → REST path (`ModelSpec`);
   `get_model_spec()` raises `KeyError` on unknown resource.
-- `client/rest.py` — REST client; auto-paginates `list()`; maps HTTP errors
-  to typed exceptions (`NetBoxConnectionError`/`PermissionError`/
-  `NotFoundError`/`ValidationError`).
+- `client/rest.py` — REST client; `list()` auto-paginates unless the
+  caller passes an explicit `limit`, in which case it returns that single
+  page as-is (NETBOX-96); maps HTTP errors to typed exceptions
+  (`NetBoxConnectionError`/`PermissionError`/`NotFoundError`/
+  `ValidationError`).
 - `client/branches.py` — branch lifecycle helpers (create/get/list/
   `wait_until_ready`) — see Gotchas re: no merge.
 - `schemas/` — Pydantic filter + write schemas, one set per covered object

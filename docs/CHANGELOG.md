@@ -105,6 +105,22 @@ All notable changes to this project will be documented in this file.
   Enum` members) to `"DeviceStatus.ACTIVE"` instead of `"active"` in query
   params, silently sending NetBox a filter it doesn't recognize. Fixed by
   dumping with `mode="json"`.
+- `client/config.py`'s `get_settings()` required `NETBOX_API_TOKEN` from
+  the environment before the caller's per-request `Authorization` token
+  (`netbox_mcp.auth.get_current_token`) ever got a chance to override it,
+  so real MCP requests failed with a missing-env-var error even when a
+  valid personal token was supplied. `NETBOX_API_TOKEN` is now optional
+  (defaults to `""`, the dev/test/CI service-account fallback); only
+  `NETBOX_URL` is required (NETBOX-97).
+- `client/rest.py`'s `list()` always followed NetBox's `next` pagination
+  link regardless of a caller-supplied `limit`, so `list_devices()` and
+  the other dedicated `list_*` tools returned the entire result set
+  instead of the requested page — exceeding the MCP transport's 1MB
+  result cap on NetBox instances with a few hundred devices. `list()` now
+  stops after the first page when `limit` is explicit; `limit`/`offset`/
+  `ordering` were also added to `schemas/filters.py`'s shared
+  `_FilterBase` (`limit` defaults to 50) so every dedicated `list_*` tool
+  is bounded by default (NETBOX-96).
 
 ### Changed
 
