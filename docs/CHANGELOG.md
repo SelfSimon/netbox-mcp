@@ -98,6 +98,11 @@ All notable changes to this project will be documented in this file.
   in `src/netbox_mcp/server.py`. See `docs/OBJECT_COVERAGE.md` for the
   object-by-object tracker of what's covered generically vs. by a
   dedicated tool.
+- `tools/generic.py`'s `write_resource(action="delete")` now requires an
+  explicit `confirm=True` argument, rejected with a clear error otherwise;
+  `create`/`update`/`patch` are unaffected. A second, agent-facing barrier
+  against accidental deletes, independent of NetBox's own permission model
+  (NETBOX-103).
 
 ### Fixed
 

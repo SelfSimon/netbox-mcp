@@ -91,6 +91,7 @@ def write_resource(
     branch: str,
     object_id: int | None = None,
     data: dict[str, Any] | None = None,
+    confirm: bool = False,
 ) -> Any:
     """Create, update, patch, or delete a NetBox object of any resource
     type registered in client/registry.py (see search_resources()),
@@ -108,10 +109,17 @@ def write_resource(
     that field's value wouldn't change. To change only some fields, use
     `action="patch"` (HTTP PATCH) instead; it only needs the fields you
     want to modify. When in doubt, prefer `patch`.
+
+    `action="delete"` additionally requires `confirm=True` — it is
+    rejected otherwise. `create`/`update`/`patch` ignore `confirm`.
     """
     _validate_resource(resource)
     if action != "create" and object_id is None:
         raise ValueError(f"object_id is required for action={action!r}")
+    if action == "delete" and not confirm:
+        raise ValueError(
+            "confirmation requise: pass confirm=True to delete this object"
+        )
 
     with _client(branch) as client:
         if action == "create":
