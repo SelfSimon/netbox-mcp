@@ -29,6 +29,13 @@ decisions.
   Read filter/Write schema/Dedicated tool only move to ✅ if an object
   earns a dedicated tool later (see README "Status").
 
+**Promotion criteria (NETBOX-109): not decided yet.** Once
+`get_resource_schema` (NETBOX-99) sees real usage, revisit this against a
+starting grid — composed semantics, real usage at Distriq, observed error
+frequency, sensitivity/scope. It's possible `get_resource_schema` +
+`write_resource` end up covering most of the remaining registry well
+enough that a dedicated tool becomes the exception rather than the norm.
+
 ## DCIM
 
 | Object | REST endpoint | Registry | Read filter | Write schema | Dedicated tool |
