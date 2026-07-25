@@ -101,11 +101,14 @@ and merge stays a human-only action in the NetBox UI.
 
 Every other NetBox object type registered in `client/registry.py`
 (~130 resources across DCIM, IPAM, virtualization, circuits, tenancy,
-wireless, VPN, extras, and users/core) is reachable through three generic
+wireless, VPN, extras, and users/core) is reachable through four generic
 tools instead of a dedicated one per object: `search_resources`,
-`get_resource`, and `write_resource` (`tools/generic.py`). A resource only
-graduates to a dedicated tool once it's high-usage enough to warrant a
-precise Pydantic schema and per-action MCP annotations — see
+`get_resource`, `get_resource_schema`, and `write_resource`
+(`tools/generic.py`) — `get_resource_schema` discovers a resource's
+required/optional fields and valid values before you call `write_resource`
+on it. A resource only graduates to a dedicated tool once it's high-usage
+enough to warrant a precise Pydantic schema and per-action MCP
+annotations — see
 [docs/OBJECT_COVERAGE.md](https://github.com/SelfSimon/netbox-mcp/blob/main/docs/OBJECT_COVERAGE.md)
 for the object-by-object tracker and the "Approach" section above for the
 rationale.

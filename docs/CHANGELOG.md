@@ -103,6 +103,18 @@ All notable changes to this project will be documented in this file.
   `create`/`update`/`patch` are unaffected. A second, agent-facing barrier
   against accidental deletes, independent of NetBox's own permission model
   (NETBOX-103).
+- `get_resource_schema(resource)` tool (`tools/generic.py`): read-only write-
+  schema discovery for any resource with no dedicated tool, via a new
+  `NetBoxRestClient.schema()` method (`client/rest.py`) that issues DRF
+  `OPTIONS` against the resource's REST path and simplifies the raw field
+  metadata — read-only fields dropped, related-object fields reduced to how
+  to reference an existing object (`id`/`slug`/`name`) rather than that
+  object's own writable fields, enum `choices` preserved. Lets an agent check
+  required/optional fields and valid values before calling `write_resource`
+  instead of discovering them via NetBox's 400 responses (NETBOX-99/100/101).
+  `_validate_resource` (shared by `get_resource`, `write_resource`, and this
+  new tool) now also suggests close resource-name matches on an unknown
+  name instead of only pointing to `search_resources()`.
 
 ### Fixed
 
