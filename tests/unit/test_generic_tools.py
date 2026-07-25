@@ -207,3 +207,13 @@ def test_write_resource_tool_is_destructive_and_not_idempotent():
 
     assert tools_by_name["write_resource"].annotations.destructiveHint is True
     assert tools_by_name["write_resource"].annotations.idempotentHint is False
+
+
+def test_validate_resource_suggests_close_matches_for_unknown_resource():
+    with pytest.raises(ValueError, match=r"did you mean.*power_panel"):
+        generic.get_resource("panel")
+
+
+def test_validate_resource_falls_back_to_search_hint_when_no_matches():
+    with pytest.raises(ValueError, match=r"call search_resources\(\)"):
+        generic.get_resource("zzzznotreal")

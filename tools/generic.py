@@ -37,10 +37,18 @@ def _validate_resource(resource: str) -> None:
     try:
         get_model_spec(resource)
     except KeyError:
-        raise ValueError(
-            f"Unknown resource {resource!r} — call search_resources() to "
-            "list valid resource names."
-        ) from None
+        needle = resource.strip().lower()
+        suggestions = [
+            name
+            for name, spec in iter_model_specs()
+            if needle and needle in f"{name} {spec.label}".lower()
+        ][:5]
+        hint = (
+            f"did you mean one of {suggestions!r}?"
+            if suggestions
+            else "call search_resources() to list valid resource names."
+        )
+        raise ValueError(f"Unknown resource {resource!r} — {hint}") from None
 
 
 def search_resources(query: str = "") -> list[dict[str, str]]:
