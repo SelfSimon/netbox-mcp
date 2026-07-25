@@ -6,9 +6,11 @@ site/device/interface/ip_address/vlan get dedicated tools in
 `tools/read.py`/`tools/write.py` because they're high-usage enough to
 warrant precise schemas and per-action MCP annotations; every other
 resource registered in `client/registry.py` (the long tail: rack, cable,
-vrf, prefix, tenant, circuit, ...) is reachable through the three tools
-below instead of a new dedicated tool per object type. See
-docs/OBJECT_COVERAGE.md for what's covered which way.
+vrf, prefix, tenant, circuit, ...) is reachable through the four tools
+below instead of a new dedicated tool per object type — including
+get_resource_schema() to discover a resource's required/optional fields
+before calling write_resource(). See docs/OBJECT_COVERAGE.md for what's
+covered which way.
 """
 
 from __future__ import annotations
@@ -93,6 +95,25 @@ def get_resource(
         return client.list(resource, filters)
 
 
+def get_resource_schema(resource: str) -> dict[str, Any]:
+    """Look up the write schema for a NetBox resource type registered in
+    client/registry.py (see search_resources() for valid names).
+
+    Returns a simplified per-field description of what write_resource()
+    accepts: required/optional, type, label, valid choices for enum
+    fields, and — for fields referencing another object (e.g. `site` on
+    `power_panel`) — which of id/slug/name to pass to reference an
+    existing object, not that object's own writable fields. Recommended
+    before write_resource() on any resource without a dedicated tool
+    (site, device, interface, ip_address, vlan already have precise
+    Pydantic schemas and don't need this). Always targets `main`, same as
+    get_resource()/search_resources() — no branch scoping.
+    """
+    _validate_resource(resource)
+    with _client() as client:
+        return client.schema(resource)
+
+
 def write_resource(
     resource: str,
     action: Literal["create", "update", "patch", "delete"],
@@ -108,8 +129,10 @@ def write_resource(
     `branch` should be the schema_id you already obtained from
     create_branch() for this task, same rule as every dedicated write
     tool. `data` is the raw NetBox REST payload — there's no Pydantic
-    validation here, NetBox's own API validates and reports errors.
-    `object_id` is required for update/patch/delete.
+    validation here, NetBox's own API validates and reports errors. Call
+    get_resource_schema(resource) first if you're unsure which fields are
+    required, optional, or which enum values are valid. `object_id` is
+    required for update/patch/delete.
 
     `action="update"` is a full replacement (HTTP PUT): `data` must
     include every required field of the object, not just the ones you're
@@ -146,7 +169,8 @@ _WRITE_ANNOTATIONS = ToolAnnotations(destructiveHint=True, idempotentHint=False)
 
 
 def register(mcp: "FastMCP") -> None:
-    """Register the generic search/get/write tools on `mcp`."""
+    """Register the generic search/get/schema/write tools on `mcp`."""
     mcp.add_tool(Tool.from_function(search_resources, annotations=_SEARCH_ANNOTATIONS))
     mcp.add_tool(Tool.from_function(get_resource, annotations=_GET_ANNOTATIONS))
+    mcp.add_tool(Tool.from_function(get_resource_schema, annotations=_GET_ANNOTATIONS))
     mcp.add_tool(Tool.from_function(write_resource, annotations=_WRITE_ANNOTATIONS))

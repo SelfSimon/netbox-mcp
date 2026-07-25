@@ -79,6 +79,46 @@ def test_get_resource_raises_value_error_for_unknown_resource():
         generic.get_resource("not-a-real-resource")
 
 
+def test_get_resource_schema_returns_client_schema(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "OPTIONS"
+        assert request.url.path == "/api/dcim/power-panels/"
+        return httpx.Response(
+            200,
+            json={
+                "actions": {
+                    "POST": {
+                        "id": {
+                            "type": "integer",
+                            "required": False,
+                            "read_only": True,
+                            "label": "ID",
+                        },
+                        "name": {
+                            "type": "string",
+                            "required": True,
+                            "read_only": False,
+                            "label": "Name",
+                            "max_length": 100,
+                        },
+                    }
+                }
+            },
+        )
+
+    monkeypatch.setattr(generic, "_client", lambda branch=None: make_client(handler))
+
+    result = generic.get_resource_schema("power_panel")
+    assert result == {
+        "name": {"type": "string", "required": True, "label": "Name", "max_length": 100}
+    }
+
+
+def test_get_resource_schema_raises_value_error_for_unknown_resource():
+    with pytest.raises(ValueError, match="Unknown resource"):
+        generic.get_resource_schema("not-a-real-resource")
+
+
 def test_write_resource_create_posts_payload(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
@@ -187,7 +227,12 @@ def test_register_adds_all_generic_tools():
     generic.register(mcp)
 
     tool_names = {tool.name for tool in asyncio.run(mcp.list_tools())}
-    assert tool_names == {"search_resources", "get_resource", "write_resource"}
+    assert tool_names == {
+        "search_resources",
+        "get_resource",
+        "get_resource_schema",
+        "write_resource",
+    }
 
 
 def test_search_and_get_tools_are_read_only():
@@ -195,7 +240,7 @@ def test_search_and_get_tools_are_read_only():
     generic.register(mcp)
     tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
-    for name in ("search_resources", "get_resource"):
+    for name in ("search_resources", "get_resource", "get_resource_schema"):
         assert tools_by_name[name].annotations.readOnlyHint is True
         assert tools_by_name[name].annotations.idempotentHint is True
 
