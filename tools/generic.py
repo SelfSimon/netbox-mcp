@@ -168,7 +168,7 @@ _GET_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
 _WRITE_ANNOTATIONS = ToolAnnotations(destructiveHint=True, idempotentHint=False)
 
 
-def register(mcp: "FastMCP") -> None:
+def register(mcp: FastMCP) -> None:
     """Register the generic search/get/schema/write tools on `mcp`."""
     mcp.add_tool(Tool.from_function(search_resources, annotations=_SEARCH_ANNOTATIONS))
     mcp.add_tool(Tool.from_function(get_resource, annotations=_GET_ANNOTATIONS))

@@ -38,15 +38,13 @@ def test_create_and_patch_site_round_trip():
 
 
 def test_create_rejects_invalid_payload():
-    with NetBoxRestClient() as rest_client:
-        with pytest.raises(NetBoxValidationError):
-            rest_client.create("site", {})
+    with NetBoxRestClient() as rest_client, pytest.raises(NetBoxValidationError):
+        rest_client.create("site", {})
 
 
 def test_delete_outside_a_branch_is_refused_client_side():
-    with NetBoxRestClient() as rest_client:
-        with pytest.raises(NetBoxNoBranchError):
-            rest_client.delete("site", 1)
+    with NetBoxRestClient() as rest_client, pytest.raises(NetBoxNoBranchError):
+        rest_client.delete("site", 1)
 
 
 def test_branch_write_is_invisible_on_main_and_visible_with_branch_header():

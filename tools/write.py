@@ -148,7 +148,7 @@ _WRITE_TOOLS = (
 )
 
 
-def register(mcp: "FastMCP") -> None:
+def register(mcp: FastMCP) -> None:
     """Register every write tool on `mcp`."""
     for fn, tool_annotations in _WRITE_TOOLS:
         mcp.add_tool(Tool.from_function(fn, annotations=tool_annotations))

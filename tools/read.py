@@ -141,7 +141,7 @@ _READ_TOOLS = (
 _READ_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
 
 
-def register(mcp: "FastMCP") -> None:
+def register(mcp: FastMCP) -> None:
     """Register every read tool on `mcp`."""
     for fn in _READ_TOOLS:
         mcp.add_tool(Tool.from_function(fn, annotations=_READ_ANNOTATIONS))
