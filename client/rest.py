@@ -41,6 +41,53 @@ def _safe_json(response: httpx.Response) -> dict[str, Any]:
         return {}
 
 
+def _simplify_reference(field: dict[str, Any]) -> dict[str, Any]:
+    children = field.get("children", {})
+    reference_by = [key for key in ("id", "slug", "name") if key in children]
+    return {
+        "type": "reference",
+        "required": field.get("required", False),
+        "label": field.get("label", ""),
+        "reference_by": reference_by,
+    }
+
+
+def _simplify_field(field: dict[str, Any]) -> dict[str, Any] | None:
+    """Reduce one raw DRF OPTIONS field to what write_resource() needs.
+
+    Returns None when the field should be dropped entirely (read-only).
+    """
+    if field.get("read_only"):
+        return None
+
+    if field.get("type") == "nested object":
+        return _simplify_reference(field)
+
+    child = field.get("child")
+    if isinstance(child, dict) and child.get("type") == "nested object":
+        reference = _simplify_reference(child)
+        return {
+            "type": "list[reference]",
+            "required": field.get("required", False),
+            "label": field.get("label", ""),
+            "reference_by": reference["reference_by"],
+        }
+
+    simplified: dict[str, Any] = {
+        "type": field.get("type"),
+        "required": field.get("required", False),
+    }
+    if "label" in field:
+        simplified["label"] = field["label"]
+    if "choices" in field:
+        simplified["choices"] = field["choices"]
+    if "max_length" in field:
+        simplified["max_length"] = field["max_length"]
+    if "help_text" in field:
+        simplified["help_text"] = field["help_text"]
+    return simplified
+
+
 class NetBoxRestClient:
     """HTTP client for the local NetBox REST API."""
 
@@ -120,6 +167,25 @@ class NetBoxRestClient:
         params = {**(filters or {}), "limit": 1}
         response = self._request("GET", spec.rest_path, params=params)
         return response.json()["count"]
+
+    def schema(self, resource: str) -> dict[str, Any]:
+        """Simplified write schema for `resource` (for write_resource()).
+
+        Issues OPTIONS against the resource's REST path and reduces DRF's
+        raw field metadata to what an agent needs before writing: required/
+        optional, type, label, enum choices, and related objects reduced to
+        how to reference them (id/slug/name), not their own writable
+        fields (NETBOX-99/100/101).
+        """
+        spec = get_model_spec(resource)
+        response = self._request("OPTIONS", spec.rest_path)
+        raw_fields = response.json().get("actions", {}).get("POST", {})
+        result: dict[str, Any] = {}
+        for name, field in raw_fields.items():
+            simplified = _simplify_field(field)
+            if simplified is not None:
+                result[name] = simplified
+        return result
 
     # -- Write ---------------------------------------------------------
 

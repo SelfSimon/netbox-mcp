@@ -234,3 +234,403 @@ def test_delete_with_active_branch_sends_delete_request():
     client = make_client(handler, branch="abc123")
 
     assert client.delete("device", 1) is None
+
+
+POWER_PANEL_OPTIONS = {
+    "actions": {
+        "POST": {
+            "id": {
+                "type": "integer",
+                "required": False,
+                "read_only": True,
+                "label": "ID",
+            },
+            "url": {
+                "type": "url",
+                "required": False,
+                "read_only": True,
+                "label": "Url",
+            },
+            "display": {
+                "type": "string",
+                "required": False,
+                "read_only": True,
+                "label": "Display",
+            },
+            "site": {
+                "type": "nested object",
+                "required": True,
+                "read_only": False,
+                "label": "Site",
+                "children": {
+                    "id": {
+                        "type": "integer",
+                        "required": False,
+                        "read_only": True,
+                        "label": "ID",
+                    },
+                    "name": {
+                        "type": "string",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Name",
+                        "max_length": 100,
+                    },
+                    "slug": {
+                        "type": "slug",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Slug",
+                        "max_length": 100,
+                    },
+                },
+            },
+            "location": {
+                "type": "nested object",
+                "required": False,
+                "read_only": False,
+                "label": "Location",
+                "children": {
+                    "id": {
+                        "type": "integer",
+                        "required": False,
+                        "read_only": True,
+                        "label": "ID",
+                    },
+                    "name": {
+                        "type": "string",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Name",
+                        "max_length": 100,
+                    },
+                    "slug": {
+                        "type": "slug",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Slug",
+                        "max_length": 100,
+                    },
+                },
+            },
+            "name": {
+                "type": "string",
+                "required": True,
+                "read_only": False,
+                "label": "Name",
+                "max_length": 100,
+            },
+            "created": {
+                "type": "datetime",
+                "required": False,
+                "read_only": True,
+                "label": "Created",
+            },
+            "last_updated": {
+                "type": "datetime",
+                "required": False,
+                "read_only": True,
+                "label": "Last updated",
+            },
+        }
+    }
+}
+
+TENANT_OPTIONS = {
+    "actions": {
+        "POST": {
+            "id": {
+                "type": "integer",
+                "required": False,
+                "read_only": True,
+                "label": "ID",
+            },
+            "name": {
+                "type": "string",
+                "required": True,
+                "read_only": False,
+                "label": "Name",
+                "max_length": 100,
+            },
+            "slug": {
+                "type": "slug",
+                "required": True,
+                "read_only": False,
+                "label": "Slug",
+                "max_length": 100,
+            },
+            "group": {
+                "type": "nested object",
+                "required": False,
+                "read_only": False,
+                "label": "Group",
+                "children": {
+                    "id": {
+                        "type": "integer",
+                        "required": False,
+                        "read_only": True,
+                        "label": "ID",
+                    },
+                    "name": {
+                        "type": "string",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Name",
+                        "max_length": 100,
+                    },
+                    "slug": {
+                        "type": "slug",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Slug",
+                        "max_length": 100,
+                    },
+                },
+            },
+            "tags": {
+                "type": "field",
+                "required": False,
+                "read_only": False,
+                "label": "Tags",
+                "child": {
+                    "type": "nested object",
+                    "required": False,
+                    "read_only": False,
+                    "children": {
+                        "id": {
+                            "type": "integer",
+                            "required": False,
+                            "read_only": True,
+                            "label": "ID",
+                        },
+                        "name": {
+                            "type": "string",
+                            "required": True,
+                            "read_only": False,
+                            "label": "Name",
+                            "max_length": 100,
+                        },
+                        "slug": {
+                            "type": "slug",
+                            "required": True,
+                            "read_only": False,
+                            "label": "Slug",
+                            "max_length": 100,
+                        },
+                    },
+                },
+            },
+            "comments": {
+                "type": "string",
+                "required": False,
+                "read_only": False,
+                "label": "Comments",
+                "help_text": "Free-form comments",
+            },
+            "created": {
+                "type": "datetime",
+                "required": False,
+                "read_only": True,
+                "label": "Created",
+            },
+            "last_updated": {
+                "type": "datetime",
+                "required": False,
+                "read_only": True,
+                "label": "Last updated",
+            },
+        }
+    }
+}
+
+RACK_OPTIONS = {
+    "actions": {
+        "POST": {
+            "id": {
+                "type": "integer",
+                "required": False,
+                "read_only": True,
+                "label": "ID",
+            },
+            "name": {
+                "type": "string",
+                "required": True,
+                "read_only": False,
+                "label": "Name",
+                "max_length": 100,
+            },
+            "site": {
+                "type": "nested object",
+                "required": True,
+                "read_only": False,
+                "label": "Site",
+                "children": {
+                    "id": {
+                        "type": "integer",
+                        "required": False,
+                        "read_only": True,
+                        "label": "ID",
+                    },
+                    "name": {
+                        "type": "string",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Name",
+                        "max_length": 100,
+                    },
+                    "slug": {
+                        "type": "slug",
+                        "required": True,
+                        "read_only": False,
+                        "label": "Slug",
+                        "max_length": 100,
+                    },
+                },
+            },
+            "status": {
+                "type": "field",
+                "required": False,
+                "read_only": False,
+                "label": "Status",
+                "choices": [
+                    {"value": "active", "display_name": "Active"},
+                    {"value": "planned", "display_name": "Planned"},
+                    {"value": "reserved", "display_name": "Reserved"},
+                ],
+            },
+            "u_height": {
+                "type": "integer",
+                "required": False,
+                "read_only": False,
+                "label": "Height (U)",
+            },
+            "created": {
+                "type": "datetime",
+                "required": False,
+                "read_only": True,
+                "label": "Created",
+            },
+        }
+    }
+}
+
+
+def test_schema_reduces_nested_objects_to_references_and_drops_read_only():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "OPTIONS"
+        assert request.url.path == "/api/dcim/power-panels/"
+        return httpx.Response(200, json=POWER_PANEL_OPTIONS)
+
+    client = make_client(handler)
+
+    assert client.schema("power_panel") == {
+        "site": {
+            "type": "reference",
+            "required": True,
+            "label": "Site",
+            "reference_by": ["id", "slug", "name"],
+        },
+        "location": {
+            "type": "reference",
+            "required": False,
+            "label": "Location",
+            "reference_by": ["id", "slug", "name"],
+        },
+        "name": {
+            "type": "string",
+            "required": True,
+            "label": "Name",
+            "max_length": 100,
+        },
+    }
+
+
+def test_schema_reduces_list_of_nested_objects_to_list_reference():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "OPTIONS"
+        assert request.url.path == "/api/tenancy/tenants/"
+        return httpx.Response(200, json=TENANT_OPTIONS)
+
+    client = make_client(handler)
+
+    assert client.schema("tenant") == {
+        "name": {
+            "type": "string",
+            "required": True,
+            "label": "Name",
+            "max_length": 100,
+        },
+        "slug": {
+            "type": "slug",
+            "required": True,
+            "label": "Slug",
+            "max_length": 100,
+        },
+        "group": {
+            "type": "reference",
+            "required": False,
+            "label": "Group",
+            "reference_by": ["id", "slug", "name"],
+        },
+        "tags": {
+            "type": "list[reference]",
+            "required": False,
+            "label": "Tags",
+            "reference_by": ["id", "slug", "name"],
+        },
+        "comments": {
+            "type": "string",
+            "required": False,
+            "label": "Comments",
+            "help_text": "Free-form comments",
+        },
+    }
+
+
+def test_schema_keeps_choices_for_enum_fields():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "OPTIONS"
+        assert request.url.path == "/api/dcim/racks/"
+        return httpx.Response(200, json=RACK_OPTIONS)
+
+    client = make_client(handler)
+
+    assert client.schema("rack") == {
+        "name": {
+            "type": "string",
+            "required": True,
+            "label": "Name",
+            "max_length": 100,
+        },
+        "site": {
+            "type": "reference",
+            "required": True,
+            "label": "Site",
+            "reference_by": ["id", "slug", "name"],
+        },
+        "status": {
+            "type": "field",
+            "required": False,
+            "label": "Status",
+            "choices": [
+                {"value": "active", "display_name": "Active"},
+                {"value": "planned", "display_name": "Planned"},
+                {"value": "reserved", "display_name": "Reserved"},
+            ],
+        },
+        "u_height": {
+            "type": "integer",
+            "required": False,
+            "label": "Height (U)",
+        },
+    }
+
+
+def test_schema_maps_404_to_not_found_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "Not found."})
+
+    client = make_client(handler)
+
+    with pytest.raises(NetBoxNotFoundError):
+        client.schema("power_panel")
