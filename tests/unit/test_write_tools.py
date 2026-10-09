@@ -153,9 +153,8 @@ def test_list_branches_returns_results(monkeypatch):
     assert write.list_branches() == [{"id": 1, "name": "b1"}]
 
 
-def test_client_uses_caller_token_not_fallback(monkeypatch):
+def test_client_uses_caller_token(monkeypatch):
     monkeypatch.setenv("NETBOX_URL", "http://netbox.local")
-    monkeypatch.setenv("NETBOX_API_TOKEN", "fallback-token")
     monkeypatch.setattr("netbox_mcp.auth.get_current_token", lambda: "caller-token")
     monkeypatch.setattr(write, "get_current_token", lambda: "caller-token")
 

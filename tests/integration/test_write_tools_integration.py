@@ -1,9 +1,7 @@
 """Integration tests for tools/write.py, against a real NetBox instance.
 
-Requires NETBOX_URL / NETBOX_API_TOKEN pointing to a running NetBox instance
-with the svc-netbox-mcp service account provisioned (see
-scripts/create_service_account.py) — same prerequisites as
-test_rest_integration.py.
+Requires NETBOX_URL / NETBOX_TEST_TOKEN (see conftest.py) — same
+prerequisites as test_rest_integration.py.
 
 Every write tool call here happens inside a netbox_branching branch created
 for the test; nothing reaches `main` directly (merge stays a human action

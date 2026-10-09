@@ -141,6 +141,15 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Removed the service-account fallback (NETBOX-115). `NETBOX_API_TOKEN` is
+  no longer read: every request must carry the caller's own NetBox token in
+  `Authorization`, and `TokenCaptureMiddleware` answers `401` (with
+  `WWW-Authenticate`) when it doesn't. `scripts/create_service_account.py`
+  is gone. Integration tests now take a personal token from
+  `NETBOX_TEST_TOKEN`, injected by `tests/integration/conftest.py`. They no
+  longer assert that merging is forbidden, because a personal token may hold
+  `merge_branch`. The guard against merging into `main` is the client having
+  no merge/sync/revert/archive call.
 - Clarified project scope: the goal is full NetBox object coverage through
   MCP (DCIM, IPAM, virtualization, circuits, tenancy, extras, ...), not a
   permanent DCIM + IPAM limit. Access control is left to NetBox's own

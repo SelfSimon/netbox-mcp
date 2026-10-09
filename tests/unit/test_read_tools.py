@@ -146,9 +146,8 @@ def test_get_vlan_requests_object_url(monkeypatch):
     assert read.get_vlan(11) == {"id": 11, "vid": 100}
 
 
-def test_client_uses_caller_token_not_fallback(monkeypatch):
+def test_client_uses_caller_token(monkeypatch):
     monkeypatch.setenv("NETBOX_URL", "http://netbox.local")
-    monkeypatch.setenv("NETBOX_API_TOKEN", "fallback-token")
     monkeypatch.setattr("netbox_mcp.auth.get_current_token", lambda: "caller-token")
     monkeypatch.setattr(read, "get_current_token", lambda: "caller-token")
 

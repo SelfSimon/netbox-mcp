@@ -18,9 +18,8 @@ NetBox — network and IT infrastructure automation.
   calling user's own NetBox API token, not a shared service account, so
   they're attributed to a real NetBox user. The branch's native `owner` and
   `BranchEvent` history give full traceability of what was changed via MCP
-  and by whom. A shared service account (`svc-netbox-mcp`, see
-  `scripts/create_service_account.py`) exists only as a fallback for local
-  dev, tests, and CI.
+  and by whom. There is no service-account fallback: a request without an
+  `Authorization` header gets `401`.
 - **Full object coverage, no MCP-side allow-list**: the goal is for every
   NetBox object type reachable over the REST API — DCIM, IPAM,
   virtualization, circuits, tenancy, extras, and so on — to be usable
@@ -57,8 +56,9 @@ pip install -r requirements.txt
 cp .env.example .env   # then fill in local values
 ```
 
-`NETBOX_API_TOKEN` in `.env` is the local dev fallback (service account),
-used when no per-request `Authorization` header is present — see
+The server holds no NetBox token of its own: MCP clients must send their
+user's NetBox API token as `Authorization: Bearer <token>` (or `Token
+<token>`), otherwise the request is rejected with `401` — see
 `src/netbox_mcp/auth.py`.
 
 ## Tests
@@ -68,7 +68,8 @@ pip install -e ".[dev]"
 pytest -m "not integration"   # fast, needs neither Docker nor a NetBox instance
 pytest -m integration         # requires a real running NetBox instance
                                # (with netbox_branching installed) + NETBOX_URL/
-                               # NETBOX_API_TOKEN in the environment;
+                               # NETBOX_TEST_TOKEN (a personal token) in the
+                               # environment;
                                # otherwise tests are skipped.
 ```
 

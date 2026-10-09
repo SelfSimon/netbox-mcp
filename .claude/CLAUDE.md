@@ -26,7 +26,8 @@
   covering every resource in `client/registry.py` that has no dedicated
   tool; same `branch`/`main` rules as above.
 - `src/netbox_mcp/auth.py` — per-request NetBox token pass-through
-  (Starlette middleware + `ContextVar`), not full OAuth.
+  (Starlette middleware + `ContextVar`), not full OAuth;
+  no token → `401`, no service-account fallback.
 
 ## Task tracking
 - Track all work items in Jira, project key `NETBOX`, under epic `NETBOX-78`.
@@ -62,7 +63,8 @@
   the schemas to new NetBox object types.
 
 ## Testing
-- `pytest -m integration` needs `NETBOX_URL`/`NETBOX_API_TOKEN` as real
+- `pytest -m integration` needs `NETBOX_URL`/`NETBOX_TEST_TOKEN` (a personal
+  token — there is no service-account fallback, see NETBOX-115) as real
   process env vars — pytest does **not** auto-load `.env` (only
   `src/netbox_mcp/server.py` does, via `python-dotenv`, at server runtime).
   Export them first, e.g. `export $(grep -v '^#' .env | xargs)`.

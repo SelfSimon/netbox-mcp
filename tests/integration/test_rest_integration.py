@@ -1,9 +1,13 @@
 """Integration tests for the REST client, against a real NetBox instance.
 
-Requires NETBOX_URL / NETBOX_API_TOKEN pointing to a running NetBox instance
-(a running NetBox instance), with the svc-netbox-mcp service account
-provisioned (see scripts/create_service_account.py) — including its
-netbox_branching view/add permissions, but deliberately no merge_branch.
+Requires NETBOX_URL pointing to a running NetBox instance with
+netbox_branching installed, and NETBOX_TEST_TOKEN holding a personal API
+token on it with netbox_branching view/add permissions (see conftest.py).
+
+Merging is not tested here: the token may well hold merge_branch (an admin's
+does), so the guard against merging into `main` is the absence of any
+merge/sync/revert call in the client — covered by
+tests/unit/test_branches.py, not by a NetBox permission.
 
 Test objects created here (sites, branches) accumulate in the target
 instance; clean them up periodically by hand in the NetBox UI. Names/slugs
@@ -12,7 +16,6 @@ are suffixed with a random id to avoid collisions between runs.
 
 import uuid
 
-import httpx
 import pytest
 
 from client.branches import create_branch, wait_until_ready
@@ -67,7 +70,7 @@ def test_branch_write_is_invisible_on_main_and_visible_with_branch_header():
         assert found["slug"] == slug
 
 
-def test_delete_inside_a_branch_succeeds_and_merge_is_forbidden():
+def test_delete_inside_a_branch_succeeds():
     branch_name = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
     slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
 
@@ -79,9 +82,5 @@ def test_delete_inside_a_branch_succeeds_and_merge_is_forbidden():
         created = branch_client.create("site", {"name": slug, "slug": slug})
         branch_client.delete("site", created["id"])
 
-    with NetBoxRestClient() as bootstrap_client:
-        response = bootstrap_client._client.post(
-            f"plugins/branching/branches/{branch['id']}/merge/",
-            json={"commit": True},
-        )
-        assert response.status_code == httpx.codes.FORBIDDEN
+    with NetBoxRestClient(branch=branch["schema_id"]) as branch_client:
+        assert branch_client.list("site", filters={"slug": slug}) == []

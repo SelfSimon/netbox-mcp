@@ -1,11 +1,13 @@
 """Per-request NetBox token pass-through.
 
-Each MCP write is attributed to the real NetBox user who made it, not to a
-shared service account: the caller's own NetBox API token travels as the
-request's `Authorization` header and is used as-is to build that request's
-`NetBoxRestClient`. NetBox itself is the only thing that ever validates the
-token (on the first real REST call) — this module just makes the raw bearer
-string available to tool handlers for the duration of the request.
+Each MCP call runs as the real NetBox user who made it — there is no shared
+service account and no fallback token: the caller's own NetBox API token
+travels as the request's `Authorization` header and is used as-is to build
+that request's `NetBoxRestClient`. A request without one is refused with
+`401` before it reaches any tool. NetBox itself is the only thing that ever
+validates the token (on the first real REST call) — this module just makes
+the raw bearer string available to tool handlers for the duration of the
+request.
 
 Deliberately not using `mcp.server.auth.settings.AuthSettings`: that flow is
 built for full OAuth (mandatory `issuer_url`/`resource_server_url`,
@@ -19,13 +21,18 @@ resets it afterwards.
 
 from __future__ import annotations
 
-import os
 from contextvars import ContextVar, Token
 
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 _current_token: ContextVar[str | None] = ContextVar("_current_token", default=None)
+
+MISSING_TOKEN_MESSAGE = (
+    "No NetBox token for this request: send your own NetBox API token as "
+    "'Authorization: Bearer <token>' (or 'Authorization: Token <token>')"
+)
 
 
 class TokenCaptureMiddleware:
@@ -33,7 +40,8 @@ class TokenCaptureMiddleware:
 
     Accepts both `Authorization: Bearer <token>` and `Authorization: Token
     <token>` (NetBox's own scheme) so users can paste their NetBox token
-    either way.
+    either way. Any HTTP request without a usable token gets `401` here,
+    so no tool ever runs without the caller's own identity.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -46,6 +54,15 @@ class TokenCaptureMiddleware:
 
         request = Request(scope)
         token = _extract_token(request.headers.get("authorization"))
+        if token is None:
+            response = JSONResponse(
+                {"error": MISSING_TOKEN_MESSAGE},
+                status_code=401,
+                headers={"WWW-Authenticate": 'Bearer realm="netbox-mcp"'},
+            )
+            await response(scope, receive, send)
+            return
+
         reset_token: Token[str | None] = _current_token.set(token)
         try:
             await self._app(scope, receive, send)
@@ -65,11 +82,8 @@ def _extract_token(header_value: str | None) -> str | None:
 def get_current_token() -> str:
     """Return the NetBox token for the in-flight request.
 
-    Falls back to `NETBOX_API_TOKEN` (service account) when no per-request
-    token was captured — local dev, tests, and any caller that hasn't wired
-    up its own NetBox token yet.
-
-    Raises NetBoxConfigurationError if neither is available.
+    Raises NetBoxConfigurationError if no per-request token was captured —
+    there is deliberately no service-account fallback.
     """
     from client.exceptions import NetBoxConfigurationError
 
@@ -77,11 +91,4 @@ def get_current_token() -> str:
     if token:
         return token
 
-    fallback = os.environ.get("NETBOX_API_TOKEN")
-    if fallback:
-        return fallback
-
-    raise NetBoxConfigurationError(
-        "No NetBox token for this request: neither an Authorization header "
-        "nor NETBOX_API_TOKEN is set"
-    )
+    raise NetBoxConfigurationError(MISSING_TOKEN_MESSAGE)

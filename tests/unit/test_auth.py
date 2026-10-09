@@ -28,8 +28,7 @@ def test_extract_token(header_value, expected):
     assert _extract_token(header_value) == expected
 
 
-def test_get_current_token_uses_contextvar_when_set(monkeypatch):
-    monkeypatch.delenv("NETBOX_API_TOKEN", raising=False)
+def test_get_current_token_uses_contextvar_when_set():
     reset = _current_token.set("per-request-token")
     try:
         assert get_current_token() == "per-request-token"
@@ -37,18 +36,12 @@ def test_get_current_token_uses_contextvar_when_set(monkeypatch):
         _current_token.reset(reset)
 
 
-def test_get_current_token_falls_back_to_env_var(monkeypatch):
+def test_get_current_token_has_no_env_var_fallback(monkeypatch):
+    # NETBOX-115: a leftover service-account token must never be used.
     monkeypatch.setenv("NETBOX_API_TOKEN", "service-account-token")
     assert _current_token.get() is None
 
-    assert get_current_token() == "service-account-token"
-
-
-def test_get_current_token_raises_when_nothing_available(monkeypatch):
-    monkeypatch.delenv("NETBOX_API_TOKEN", raising=False)
-    assert _current_token.get() is None
-
-    with pytest.raises(NetBoxConfigurationError):
+    with pytest.raises(NetBoxConfigurationError, match="Authorization"):
         get_current_token()
 
 
@@ -62,8 +55,7 @@ def _make_app() -> Starlette:
     return app
 
 
-def test_middleware_captures_token_for_the_request(monkeypatch):
-    monkeypatch.delenv("NETBOX_API_TOKEN", raising=False)
+def test_middleware_captures_token_for_the_request():
     client = TestClient(_make_app())
 
     response = client.get("/whoami", headers={"Authorization": "Bearer user-token"})
@@ -71,21 +63,23 @@ def test_middleware_captures_token_for_the_request(monkeypatch):
     assert response.json() == {"token": "user-token"}
 
 
-def test_middleware_leaves_contextvar_unset_without_header(monkeypatch):
-    monkeypatch.delenv("NETBOX_API_TOKEN", raising=False)
+@pytest.mark.parametrize("headers", [{}, {"Authorization": "Basic abc123"}])
+def test_middleware_rejects_request_without_token(headers):
     client = TestClient(_make_app())
 
-    response = client.get("/whoami")
+    response = client.get("/whoami", headers=headers)
 
-    assert response.json() == {"token": None}
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"].startswith("Bearer")
+    assert "Authorization" in response.json()["error"]
 
 
-def test_middleware_resets_contextvar_between_requests(monkeypatch):
-    monkeypatch.delenv("NETBOX_API_TOKEN", raising=False)
+def test_middleware_resets_contextvar_between_requests():
     client = TestClient(_make_app())
 
-    client.get("/whoami", headers={"Authorization": "Bearer user-token"})
-    response = client.get("/whoami")
+    first = client.get("/whoami", headers={"Authorization": "Bearer user-token"})
+    second = client.get("/whoami", headers={"Authorization": "Token other-token"})
 
-    assert response.json() == {"token": None}
+    assert first.json() == {"token": "user-token"}
+    assert second.json() == {"token": "other-token"}
     assert _current_token.get() is None
