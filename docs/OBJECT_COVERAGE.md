@@ -182,6 +182,33 @@ enough that a dedicated tool becomes the exception rather than the norm.
 | Data file | `core/data-files/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Job | `core/jobs/` | ✅ | ⬜ | ⬜ | ⬜ |
 
+## Plugins
+
+**How the MCP should handle plugin objects is not decided yet (NETBOX-117).**
+None of the plugins installed on the production instance
+(`netbox-custom-config`, NetBox v4.6.5-5.0.2) has a resource in
+`client/registry.py`, so their objects are reachable through neither the
+dedicated nor the generic tools. `netbox_security` is the priority. Which
+of these plugins actually expose REST objects worth covering (some are
+UI-only) is part of NETBOX-117's inventory.
+
+Versions below mirror `docs/plugins.md` in
+[netbox-custom-config](https://github.com/DistriQ-Zone/netbox-custom-config/blob/main/docs/plugins.md),
+which is the source of truth — check it before trusting this table.
+
+| Plugin | Version | REST endpoint | Registry | Read filter | Write schema | Dedicated tool |
+|---|---|---|---|---|---|---|
+| `netbox_security` | 1.5.11 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+| `netbox_attachments` | 11.3.1 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+| `netbox_topology_views` | 4.5.1 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+| `netbox_topology_explorer` | 0.2.0 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+| `netbox_device_view` | 0.4.0 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+| `netbox_reorder_rack` | 1.1.4 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+| `netbox_contextmenus` | 1.4.14 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+
+`netbox_branching` (1.1.3) is also installed but deliberately kept out of
+the registry — see below.
+
 ## Handled outside the registry
 
 `netbox_branching` branches (`plugins/branching/branches/`) are not, and
