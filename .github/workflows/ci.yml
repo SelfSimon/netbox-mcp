@@ -25,6 +25,7 @@ jobs:
       - name: Lint (ruff)
         run: |
           python -m ruff check .
+          python -m ruff format --check .
       - name: Run tests
         run: |
           pytest -m "not integration" -q

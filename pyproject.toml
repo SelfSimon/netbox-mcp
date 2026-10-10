@@ -37,8 +37,6 @@ dev = [
     "pytest>=8.0",
     "pytest-mock>=3.14",
     "ruff==0.16.0",
-    "black>=23.0",
-    "isort>=5.10",
     "pre-commit>=2.20",
 ]
 
@@ -53,10 +51,4 @@ include = ["netbox_mcp*", "client*", "schemas*", "tools*"]
 line-length = 88
 
 [tool.ruff.lint]
-extend-select = ["E", "F", "W"]
-
-[tool.black]
-line-length = 88
-
-[tool.isort]
-profile = "black"
+extend-select = ["E", "F", "W", "I"]

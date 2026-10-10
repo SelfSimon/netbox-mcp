@@ -5,8 +5,9 @@
 - `python -m netbox_mcp.server` — run the server locally (needs `.env`, see
   `.env.example`)
 - `pytest -m "not integration"` — unit tests (what `ci.yml` runs)
-- `ruff check .` — lint (the only linter CI enforces — `black`/`isort` are in
-  `.pre-commit-config.yaml` but **not** run in CI, so local drift is possible)
+- `ruff check .` — lint + import sorting; `ruff format --check .` —
+  formatting. CI enforces both, and `.pre-commit-config.yaml` runs the
+  fixing variants (`ruff check --fix`, `ruff format`).
 
 ## Architecture
 - `client/registry.py` — NetBox object type → REST path (`ModelSpec`);

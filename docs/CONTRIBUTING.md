@@ -6,6 +6,6 @@
 Guidelines:
 - Keep changes focused and well-documented.
 - Add tests for new features or bug fixes.
-- Run `pre-commit run --all-files` (ruff, black, isort) before committing.
+- Run `pre-commit run --all-files` (`ruff check --fix`, `ruff format`) before committing.
 
 Maintainer contact: see repository settings.

@@ -141,6 +141,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Dev tooling now uses Ruff alone: `ruff check --fix` (with the `I` rule for
+  import sorting) and `ruff format` replace black and isort in
+  `.pre-commit-config.yaml` and in the `dev` extras. CI now also runs
+  `ruff format --check .` (NETBOX-118).
 - Removed the service-account fallback (NETBOX-115). `NETBOX_API_TOKEN` is
   no longer read: every request must carry the caller's own NetBox token in
   `Authorization`, and `TokenCaptureMiddleware` answers `401` (with
