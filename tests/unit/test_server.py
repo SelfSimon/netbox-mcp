@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import httpx
+import pytest
 from fastmcp import Client
 
 from client.config import ClientSettings
@@ -24,10 +25,12 @@ def test_initialize_returns_the_server_instructions():
         assert keyword in instructions
 
 
-def test_truncated_list_stays_under_one_megabyte_on_the_wire(monkeypatch):
+@pytest.mark.parametrize("char", ["x", '"', "\\", "\n", "\x01", "é"])
+def test_truncated_list_stays_under_one_megabyte_on_the_wire(monkeypatch, char):
     """NETBOX-116: the cap is measured on the result, but what must fit in
-    the client's ~1 MB limit is the whole JSON-RPC message FastMCP emits."""
-    devices = [{"id": i, "config_context": {"blob": "x" * 20_000}} for i in range(50)]
+    the client's ~1 MB limit is the whole JSON-RPC message FastMCP emits.
+    Quotes and backslashes are escaped twice in the text copy."""
+    devices = [{"id": i, "config_context": {"blob": char * 20_000}} for i in range(50)]
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

@@ -12,8 +12,10 @@ rules hold for dedicated and generic tools alike:
   object can be large (`config_context`, `custom_fields`, nested objects).
 
 The default cap is well under 1 MB on purpose: FastMCP sends a dict result
-twice (as text content and as structured content), so the bytes on the wire
-are about double what is measured here.
+twice (as structured content, and as JSON text embedded in a JSON string),
+so the bytes on the wire are double what is measured here. `_size()` counts
+both copies, since the embedded one grows with every `"` and `\\` it has to
+escape a second time.
 """
 
 from __future__ import annotations
@@ -43,11 +45,15 @@ def max_response_bytes() -> int:
 
 
 def _size(value: Any) -> int:
-    return len(
-        json.dumps(
-            value, separators=(",", ":"), ensure_ascii=False, default=str
-        ).encode("utf-8")
-    )
+    """Half the bytes `value` takes on the wire, rounded up.
+
+    Equal to the serialized size for plain content, and up to 1.5 times
+    that for content full of quotes or backslashes, so the wire size never
+    exceeds twice the cap whatever the objects hold.
+    """
+    text = json.dumps(value, separators=(",", ":"), ensure_ascii=False, default=str)
+    embedded = json.dumps(text, ensure_ascii=False)
+    return (len(text.encode("utf-8")) + len(embedded.encode("utf-8")) + 1) // 2
 
 
 def selection_params(
