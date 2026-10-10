@@ -124,6 +124,13 @@ All notable changes to this project will be documented in this file.
   parameters of the five `get_*` tools and of `get_resource`. They are sent
   as plain NetBox query params; `fields` was verified against NetBox 4.6.2.
   They are what makes a full inventory fit in one call.
+- Server `instructions` in `InitializeResult` (NETBOX-108,
+  `src/netbox_mcp/server.py`): the rules that span several tools — the list
+  envelope and how to page, `brief`/`fields`, one branch per task and
+  human-only merge, dedicated vs generic tools, `get_resource_schema` before
+  `write_resource`, `patch` vs `update`. Not every MCP client passes
+  `instructions` on to the model, so the tool descriptions stay the source
+  of truth.
 
 ### Fixed
 
