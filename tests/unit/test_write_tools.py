@@ -150,7 +150,60 @@ def test_list_branches_returns_results(monkeypatch):
         write, "_client", lambda branch=None: make_client(handler, branch=branch)
     )
 
-    assert write.list_branches() == [{"id": 1, "name": "b1"}]
+    assert write.list_branches() == {
+        "count": 1,
+        "returned": 1,
+        "offset": 0,
+        "truncated": False,
+        "next_offset": None,
+        "results": [{"id": 1, "name": "b1"}],
+    }
+
+
+def test_list_branches_sends_limit_and_offset(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["limit"] == "5"
+        assert request.url.params["offset"] == "10"
+        return httpx.Response(
+            200,
+            json={"count": 40, "next": None, "previous": None, "results": [{"id": 1}]},
+        )
+
+    monkeypatch.setattr(
+        write, "_client", lambda branch=None: make_client(handler, branch=branch)
+    )
+
+    result = write.list_branches(limit=5, offset=10)
+
+    assert result["count"] == 40
+    assert result["truncated"] is True
+    assert result["next_offset"] == 11
+
+
+def test_write_result_over_the_size_cap_is_reduced_to_a_reference(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            201,
+            json={
+                "id": 9,
+                "url": "http://netbox.local/api/dcim/devices/9/",
+                "display": "sw01",
+                "config_context": {"blob": "x" * 5000},
+            },
+        )
+
+    monkeypatch.setenv("MCP_MAX_RESPONSE_BYTES", "2000")
+    monkeypatch.setattr(
+        write, "_client", lambda branch=None: make_client(handler, branch=branch)
+    )
+
+    result = write.create_device(
+        DeviceCreate(name="sw01", device_type=1, role=1, site=1), branch="br1"
+    )
+
+    assert result["id"] == 9
+    assert result["truncated"] is True
+    assert "config_context" not in result
 
 
 def test_client_uses_caller_token(monkeypatch):

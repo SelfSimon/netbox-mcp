@@ -41,7 +41,7 @@ netbox-mcp/
 ├── src/netbox_mcp/   # server entry point (server.py) + auth pass-through (auth.py)
 ├── client/           # REST data client (rest.py) + branch helpers (branches.py)
 ├── schemas/          # Pydantic schemas + copied NetBox enums
-├── tools/            # read and write MCP tools
+├── tools/            # read, write and generic MCP tools + result shaping (response.py)
 ├── Dockerfile         # standalone Python image
 ├── requirements.txt
 └── .env.example
@@ -113,3 +113,27 @@ annotations — see
 [docs/OBJECT_COVERAGE.md](https://github.com/SelfSimon/netbox-mcp/blob/main/docs/OBJECT_COVERAGE.md)
 for the object-by-object tracker and the "Approach" section above for the
 rationale.
+
+### Lists, paging and response size
+
+Every tool that returns a list (`list_*`, `get_resource` without an
+`object_id`, `search_resources`, `list_branches`) returns an envelope, never
+a bare list:
+
+```json
+{"count": 4127, "returned": 50, "offset": 0, "truncated": true,
+ "next_offset": 50, "results": [...]}
+```
+
+- `count` is the total matching in NetBox; `truncated` means there is more —
+  call again with `offset=next_offset`.
+- A list holds 50 objects by default and 1000 at most (`limit`). No tool
+  ever walks a whole table.
+- A result is also capped in size (`MCP_MAX_RESPONSE_BYTES`, default
+  400 000 bytes) because MCP clients fail opaquely on results over ~1 MB. A
+  list over the cap is cut short and carries a `hint`; a single object over
+  the cap is an explicit error.
+- To get more objects per call, ask for less of each one: `fields=["id",
+  "name", ...]` returns only those fields, and `brief=True` returns NetBox's
+  minimal representation — which leaves out custom fields, tags and related
+  objects.

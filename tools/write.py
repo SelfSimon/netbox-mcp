@@ -15,14 +15,15 @@ account, same as tools/read.py.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from client import branches as branch_client
 from client.config import get_settings
-from client.rest import NetBoxRestClient
+from client.rest import DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, NetBoxRestClient
 from netbox_mcp.auth import get_current_token
 from schemas.writes import (
     DeviceCreate,
@@ -31,6 +32,7 @@ from schemas.writes import (
     InterfaceUpdate,
     IPAddressAssign,
 )
+from tools.response import list_response, write_response
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -49,7 +51,7 @@ def create_device(payload: DeviceCreate, branch: str) -> dict[str, Any]:
     related write, don't create a new one per call.
     """
     with _client(branch) as client:
-        return client.create("device", payload.to_payload())
+        return write_response(client.create("device", payload.to_payload()))
 
 
 def update_device(device_id: int, payload: DeviceUpdate, branch: str) -> dict[str, Any]:
@@ -60,7 +62,7 @@ def update_device(device_id: int, payload: DeviceUpdate, branch: str) -> dict[st
     related write, don't create a new one per call.
     """
     with _client(branch) as client:
-        return client.patch("device", device_id, payload.to_payload())
+        return write_response(client.patch("device", device_id, payload.to_payload()))
 
 
 def create_interface(payload: InterfaceCreate, branch: str) -> dict[str, Any]:
@@ -71,7 +73,7 @@ def create_interface(payload: InterfaceCreate, branch: str) -> dict[str, Any]:
     related write, don't create a new one per call.
     """
     with _client(branch) as client:
-        return client.create("interface", payload.to_payload())
+        return write_response(client.create("interface", payload.to_payload()))
 
 
 def update_interface(
@@ -84,7 +86,9 @@ def update_interface(
     related write, don't create a new one per call.
     """
     with _client(branch) as client:
-        return client.patch("interface", interface_id, payload.to_payload())
+        return write_response(
+            client.patch("interface", interface_id, payload.to_payload())
+        )
 
 
 def assign_ip_address(payload: IPAddressAssign, branch: str) -> dict[str, Any]:
@@ -96,7 +100,7 @@ def assign_ip_address(payload: IPAddressAssign, branch: str) -> dict[str, Any]:
     related write, don't create a new one per call.
     """
     with _client(branch) as client:
-        return client.create("ip_address", payload.to_payload())
+        return write_response(client.create("ip_address", payload.to_payload()))
 
 
 def create_branch(name: str, description: str = "") -> dict[str, Any]:
@@ -122,15 +126,24 @@ def create_branch(name: str, description: str = "") -> dict[str, Any]:
         return branch_client.wait_until_ready(client, created["id"])
 
 
-def list_branches() -> list[dict[str, Any]]:
+def list_branches(
+    limit: Annotated[int, Field(ge=1, le=MAX_LIST_LIMIT)] = DEFAULT_LIST_LIMIT,
+    offset: Annotated[int, Field(ge=0)] = 0,
+) -> dict[str, Any]:
     """List netbox_branching branches.
 
     Before calling create_branch(), check here for an existing
     "ready"-status branch you already created for the current task, and
     reuse its schema_id instead of creating a new one.
+
+    Returns `{count, returned, offset, truncated, next_offset, results}`;
+    when `truncated` is true, continue from `next_offset`.
     """
+    params: dict[str, Any] = {"limit": limit}
+    if offset:
+        params["offset"] = offset
     with _client() as client:
-        return branch_client.list_branches(client)
+        return list_response(branch_client.list_branches(client, params))
 
 
 _CREATE_ANNOTATIONS = ToolAnnotations(destructiveHint=False, idempotentHint=False)

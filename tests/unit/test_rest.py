@@ -82,7 +82,71 @@ def test_get_sends_get_to_object_url():
     assert result == {"id": 42, "name": "sw01"}
 
 
-def test_list_follows_pagination():
+def paged_devices_handler(calls):
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "count": 300,
+                "next": "http://netbox.local/api/dcim/devices/?limit=50&offset=50",
+                "previous": None,
+                "results": [{"id": i} for i in range(50)],
+            },
+        )
+
+    return handler
+
+
+def test_list_without_limit_makes_a_single_bounded_request():
+    """NETBOX-113: no `limit` used to mean "follow every `next` link"."""
+    calls = []
+    client = make_client(paged_devices_handler(calls))
+
+    result = client.list("device")
+
+    assert len(result) == 50
+    assert len(calls) == 1
+    assert calls[0].params["limit"] == "50"
+
+
+@pytest.mark.parametrize("limit", [0, 5000])
+def test_list_caps_limit_at_the_maximum(limit):
+    calls = []
+    client = make_client(paged_devices_handler(calls))
+
+    client.list("device", filters={"limit": limit})
+
+    assert calls[0].params["limit"] == "1000"
+
+
+def test_list_page_returns_count_limit_and_offset():
+    calls = []
+    client = make_client(paged_devices_handler(calls))
+
+    page = client.list_page("device", {"offset": 100})
+
+    assert len(calls) == 1
+    assert page["count"] == 300
+    assert page["limit"] == 50
+    assert page["offset"] == 100
+    assert len(page["results"]) == 50
+
+
+def test_get_sends_field_selection_params():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["fields"] == "id,name"
+        return httpx.Response(200, json={"id": 42, "name": "sw01"})
+
+    client = make_client(handler)
+
+    assert client.get("device", 42, {"fields": "id,name"}) == {
+        "id": 42,
+        "name": "sw01",
+    }
+
+
+def test_list_follows_pagination_only_when_asked():
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -109,7 +173,7 @@ def test_list_follows_pagination():
 
     client = make_client(handler)
 
-    result = client.list("device")
+    result = client.list("device", paginate=True)
 
     assert result == [{"id": 1}, {"id": 2}, {"id": 3}]
     assert len(calls) == 2

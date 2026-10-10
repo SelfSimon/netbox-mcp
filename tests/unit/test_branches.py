@@ -61,28 +61,28 @@ def test_get_branch_returns_branch():
     assert result["id"] == 7
 
 
-def test_list_branches_follows_pagination():
+def test_list_branches_returns_one_bounded_page():
+    calls = []
+
     def handler(request: httpx.Request) -> httpx.Response:
-        if "offset" not in request.url.params:
-            return httpx.Response(
-                200,
-                json={
-                    "count": 2,
-                    "next": "http://netbox.local/api/plugins/branching/branches/?offset=1",
-                    "previous": None,
-                    "results": [{"id": 1}],
-                },
-            )
+        calls.append(request.url)
         return httpx.Response(
             200,
-            json={"count": 2, "next": None, "previous": None, "results": [{"id": 2}]},
+            json={
+                "count": 2,
+                "next": "http://netbox.local/api/plugins/branching/branches/?offset=1",
+                "previous": None,
+                "results": [{"id": 1}],
+            },
         )
 
     client = make_client(handler)
 
     result = list_branches(client)
 
-    assert result == [{"id": 1}, {"id": 2}]
+    assert len(calls) == 1
+    assert calls[0].params["limit"] == "50"
+    assert result == {"count": 2, "limit": 50, "offset": 0, "results": [{"id": 1}]}
 
 
 def test_wait_until_ready_returns_immediately_if_already_ready():

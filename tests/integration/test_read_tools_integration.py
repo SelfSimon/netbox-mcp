@@ -26,7 +26,9 @@ def test_list_sites_and_get_site_round_trip():
         created = bootstrap_client.create("site", {"name": slug, "slug": slug})
 
     matches = read.list_sites(SiteFilter(slug=slug))
-    assert [s["slug"] for s in matches] == [slug]
+    assert [s["slug"] for s in matches["results"]] == [slug]
+    assert matches["count"] == 1
+    assert matches["truncated"] is False
 
     fetched = read.get_site(created["id"])
     assert fetched["slug"] == slug
@@ -47,8 +49,45 @@ def test_status_filter_is_honored_by_netbox_not_silently_ignored():
     active_matches = read.list_sites(SiteFilter(slug=slug, status=SiteStatus.ACTIVE))
     retired_matches = read.list_sites(SiteFilter(slug=slug, status=SiteStatus.RETIRED))
 
-    assert [s["slug"] for s in active_matches] == [slug]
-    assert retired_matches == []
+    assert [s["slug"] for s in active_matches["results"]] == [slug]
+    assert retired_matches["results"] == []
+
+
+def test_brief_and_fields_are_honored_by_netbox():
+    """NETBOX-114: both are plain query params, so NetBox silently ignores
+    them if the deployed version doesn't support them — assert on the keys
+    actually returned."""
+    slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
+    with NetBoxRestClient() as bootstrap_client:
+        created = bootstrap_client.create("site", {"name": slug, "slug": slug})
+
+    full = read.get_site(created["id"])
+    brief = read.get_site(created["id"], brief=True)
+    selected = read.get_site(created["id"], fields=["id", "slug"])
+    listed = read.list_sites(SiteFilter(slug=slug, fields=["id", "slug"]))
+    listed_brief = read.list_sites(SiteFilter(slug=slug, brief=True))
+
+    assert "custom_fields" in full
+    assert "custom_fields" not in brief
+    assert set(brief) < set(full)
+    assert selected == {"id": created["id"], "slug": slug}
+    assert listed["results"] == [{"id": created["id"], "slug": slug}]
+    assert "custom_fields" not in listed_brief["results"][0]
+
+
+def test_list_sites_is_bounded_and_reports_the_total():
+    """NETBOX-113: `limit=1` returns one site, with the real total."""
+    for _ in range(2):
+        slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
+        with NetBoxRestClient() as bootstrap_client:
+            bootstrap_client.create("site", {"name": slug, "slug": slug})
+
+    page = read.list_sites(SiteFilter(limit=1))
+
+    assert page["returned"] == 1
+    assert page["count"] >= 2
+    assert page["truncated"] is True
+    assert page["next_offset"] == 1
 
 
 def test_get_site_missing_raises_not_found():
@@ -57,7 +96,9 @@ def test_get_site_missing_raises_not_found():
 
 
 def test_list_devices_smoke():
-    assert isinstance(read.list_devices(), list)
+    page = read.list_devices()
+    assert page["returned"] == len(page["results"]) <= 50
+    assert page["count"] >= page["returned"]
 
 
 def test_get_device_missing_raises_not_found():
@@ -67,7 +108,10 @@ def test_get_device_missing_raises_not_found():
 
 def test_list_interfaces_with_filter_matching_nothing_is_empty():
     bogus_name = f"netbox-mcp-test-{uuid.uuid4().hex}"
-    assert read.list_interfaces(InterfaceFilter(name=bogus_name)) == []
+    page = read.list_interfaces(InterfaceFilter(name=bogus_name))
+    assert page["results"] == []
+    assert page["count"] == 0
+    assert page["truncated"] is False
 
 
 def test_get_interface_missing_raises_not_found():
@@ -76,7 +120,9 @@ def test_get_interface_missing_raises_not_found():
 
 
 def test_list_ip_addresses_smoke():
-    assert isinstance(read.list_ip_addresses(), list)
+    page = read.list_ip_addresses()
+    assert page["returned"] == len(page["results"]) <= 50
+    assert page["count"] >= page["returned"]
 
 
 def test_get_ip_address_missing_raises_not_found():
@@ -85,7 +131,9 @@ def test_get_ip_address_missing_raises_not_found():
 
 
 def test_list_vlans_smoke():
-    assert isinstance(read.list_vlans(), list)
+    page = read.list_vlans()
+    assert page["returned"] == len(page["results"]) <= 50
+    assert page["count"] >= page["returned"]
 
 
 def test_get_vlan_missing_raises_not_found():

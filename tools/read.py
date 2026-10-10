@@ -9,6 +9,10 @@ token (`netbox_mcp.auth.get_current_token`), never a shared service
 account, and issues an unscoped request (no `netbox_branching` branch):
 reads always see `main` as it stands, since branching only matters for the
 write tools.
+
+Results are shaped by `tools/response.py`: `list_*` tools return an envelope
+(`count`, `returned`, `truncated`, `next_offset`, `results`) and every
+result stays under the response size cap.
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from schemas.filters import (
     SiteFilter,
     VLANFilter,
 )
+from tools.response import list_response, object_response, selection_params
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -39,89 +44,149 @@ def _client() -> NetBoxRestClient:
     return NetBoxRestClient(settings)
 
 
-def list_sites(filters: SiteFilter | None = None) -> list[dict[str, Any]]:
+def list_sites(filters: SiteFilter | None = None) -> dict[str, Any]:
     """List NetBox sites, optionally narrowed by filters.
 
-    Defaults to the first 50 results; pass `limit`/`offset` to page
-    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
-    "-created") to sort.
+    Returns `{count, returned, offset, truncated, next_offset, results}`:
+    `count` is the total matching in NetBox, and `truncated` means there is
+    more — continue from `next_offset`. Defaults to the first 50 results;
+    pass `limit` (max 1000) / `offset` to page, `ordering` (e.g.
+    "-created") to sort, and `brief` or `fields` to get smaller objects.
     """
     with _client() as client:
-        return client.list("site", (filters or SiteFilter()).to_params())
+        return list_response(
+            client.list_page("site", (filters or SiteFilter()).to_params())
+        )
 
 
-def get_site(site_id: int) -> dict[str, Any]:
-    """Get a single NetBox site by ID."""
+def get_site(
+    site_id: int, brief: bool = False, fields: list[str] | None = None
+) -> dict[str, Any]:
+    """Get a single NetBox site by ID.
+
+    Pass `fields` (e.g. ["id", "name"]) or `brief=True` to get only part
+    of the object.
+    """
     with _client() as client:
-        return client.get("site", site_id)
+        return object_response(
+            client.get("site", site_id, selection_params(brief, fields))
+        )
 
 
-def list_devices(filters: DeviceFilter | None = None) -> list[dict[str, Any]]:
+def list_devices(filters: DeviceFilter | None = None) -> dict[str, Any]:
     """List NetBox devices, optionally narrowed by filters.
 
-    Defaults to the first 50 results; pass `limit`/`offset` to page
-    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
-    "-created") to sort.
+    Returns `{count, returned, offset, truncated, next_offset, results}`:
+    `count` is the total matching in NetBox, and `truncated` means there is
+    more — continue from `next_offset`. Defaults to the first 50 results;
+    pass `limit` (max 1000) / `offset` to page, `ordering` (e.g.
+    "-created") to sort, and `brief` or `fields` to get smaller objects.
     """
     with _client() as client:
-        return client.list("device", (filters or DeviceFilter()).to_params())
+        return list_response(
+            client.list_page("device", (filters or DeviceFilter()).to_params())
+        )
 
 
-def get_device(device_id: int) -> dict[str, Any]:
-    """Get a single NetBox device by ID."""
+def get_device(
+    device_id: int, brief: bool = False, fields: list[str] | None = None
+) -> dict[str, Any]:
+    """Get a single NetBox device by ID.
+
+    Pass `fields` (e.g. ["id", "name"]) or `brief=True` to get only part
+    of the object.
+    """
     with _client() as client:
-        return client.get("device", device_id)
+        return object_response(
+            client.get("device", device_id, selection_params(brief, fields))
+        )
 
 
-def list_interfaces(filters: InterfaceFilter | None = None) -> list[dict[str, Any]]:
+def list_interfaces(filters: InterfaceFilter | None = None) -> dict[str, Any]:
     """List NetBox device interfaces, optionally narrowed by filters.
 
-    Defaults to the first 50 results; pass `limit`/`offset` to page
-    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
-    "-created") to sort.
+    Returns `{count, returned, offset, truncated, next_offset, results}`:
+    `count` is the total matching in NetBox, and `truncated` means there is
+    more — continue from `next_offset`. Defaults to the first 50 results;
+    pass `limit` (max 1000) / `offset` to page, `ordering` (e.g.
+    "-created") to sort, and `brief` or `fields` to get smaller objects.
     """
     with _client() as client:
-        return client.list("interface", (filters or InterfaceFilter()).to_params())
+        return list_response(
+            client.list_page("interface", (filters or InterfaceFilter()).to_params())
+        )
 
 
-def get_interface(interface_id: int) -> dict[str, Any]:
-    """Get a single NetBox device interface by ID."""
+def get_interface(
+    interface_id: int, brief: bool = False, fields: list[str] | None = None
+) -> dict[str, Any]:
+    """Get a single NetBox device interface by ID.
+
+    Pass `fields` (e.g. ["id", "name"]) or `brief=True` to get only part
+    of the object.
+    """
     with _client() as client:
-        return client.get("interface", interface_id)
+        return object_response(
+            client.get("interface", interface_id, selection_params(brief, fields))
+        )
 
 
-def list_ip_addresses(filters: IPAddressFilter | None = None) -> list[dict[str, Any]]:
+def list_ip_addresses(filters: IPAddressFilter | None = None) -> dict[str, Any]:
     """List NetBox IP addresses, optionally narrowed by filters.
 
-    Defaults to the first 50 results; pass `limit`/`offset` to page
-    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
-    "-created") to sort.
+    Returns `{count, returned, offset, truncated, next_offset, results}`:
+    `count` is the total matching in NetBox, and `truncated` means there is
+    more — continue from `next_offset`. Defaults to the first 50 results;
+    pass `limit` (max 1000) / `offset` to page, `ordering` (e.g.
+    "-created") to sort, and `brief` or `fields` to get smaller objects.
     """
     with _client() as client:
-        return client.list("ip_address", (filters or IPAddressFilter()).to_params())
+        return list_response(
+            client.list_page("ip_address", (filters or IPAddressFilter()).to_params())
+        )
 
 
-def get_ip_address(ip_address_id: int) -> dict[str, Any]:
-    """Get a single NetBox IP address by ID."""
+def get_ip_address(
+    ip_address_id: int, brief: bool = False, fields: list[str] | None = None
+) -> dict[str, Any]:
+    """Get a single NetBox IP address by ID.
+
+    Pass `fields` (e.g. ["id", "name"]) or `brief=True` to get only part
+    of the object.
+    """
     with _client() as client:
-        return client.get("ip_address", ip_address_id)
+        return object_response(
+            client.get("ip_address", ip_address_id, selection_params(brief, fields))
+        )
 
 
-def list_vlans(filters: VLANFilter | None = None) -> list[dict[str, Any]]:
+def list_vlans(filters: VLANFilter | None = None) -> dict[str, Any]:
     """List NetBox VLANs, optionally narrowed by filters.
 
-    Defaults to the first 50 results; pass `limit`/`offset` to page
-    further or a larger `limit` (0 for no limit), and `ordering` (e.g.
-    "-created") to sort.
+    Returns `{count, returned, offset, truncated, next_offset, results}`:
+    `count` is the total matching in NetBox, and `truncated` means there is
+    more — continue from `next_offset`. Defaults to the first 50 results;
+    pass `limit` (max 1000) / `offset` to page, `ordering` (e.g.
+    "-created") to sort, and `brief` or `fields` to get smaller objects.
     """
     with _client() as client:
-        return client.list("vlan", (filters or VLANFilter()).to_params())
+        return list_response(
+            client.list_page("vlan", (filters or VLANFilter()).to_params())
+        )
 
 
-def get_vlan(vlan_id: int) -> dict[str, Any]:
-    """Get a single NetBox VLAN by ID."""
+def get_vlan(
+    vlan_id: int, brief: bool = False, fields: list[str] | None = None
+) -> dict[str, Any]:
+    """Get a single NetBox VLAN by ID.
+
+    Pass `fields` (e.g. ["id", "name"]) or `brief=True` to get only part
+    of the object.
+    """
     with _client() as client:
-        return client.get("vlan", vlan_id)
+        return object_response(
+            client.get("vlan", vlan_id, selection_params(brief, fields))
+        )
 
 
 _READ_TOOLS = (

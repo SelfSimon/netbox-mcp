@@ -33,6 +33,28 @@ from .registry import get_model_spec
 
 BRANCH_HEADER = "X-NetBox-Branch"
 
+# Every list request is bounded (NETBOX-113): `DEFAULT_LIST_LIMIT` when the
+# caller gives no `limit`, and never more than `MAX_LIST_LIMIT` per request.
+DEFAULT_LIST_LIMIT = 50
+MAX_LIST_LIMIT = 1000
+
+
+def _bounded_params(filters: dict[str, Any] | None) -> dict[str, Any]:
+    """Copy `filters` with a `limit` that is always set and capped.
+
+    A missing `limit` becomes `DEFAULT_LIST_LIMIT`. `0` (NetBox's own "no
+    limit" convention) and anything above `MAX_LIST_LIMIT` become
+    `MAX_LIST_LIMIT`, so no request can ask NetBox for a whole table.
+    """
+    params = dict(filters or {})
+    limit = params.get("limit")
+    if limit is None:
+        limit = DEFAULT_LIST_LIMIT
+    elif not 1 <= int(limit) <= MAX_LIST_LIMIT:
+        limit = MAX_LIST_LIMIT
+    params["limit"] = int(limit)
+    return params
+
 
 def _safe_json(response: httpx.Response) -> dict[str, Any]:
     try:
@@ -127,28 +149,38 @@ class NetBoxRestClient:
 
     # -- Read --------------------------------------------------------
 
-    def list(
+    def list_page(
         self, resource: str, filters: dict[str, Any] | None = None
-    ) -> list[dict[str, Any]]:
-        """Return objects matching `filters`.
+    ) -> dict[str, Any]:
+        """Return one bounded page of objects matching `filters`.
 
-        Auto-paginates through every page when `filters` has no explicit
-        `limit`. If it does, a single request is made and that page is
-        returned as-is: previously `next` was always followed regardless
-        of `limit`, so a caller-supplied limit was silently ignored and
-        the full result set came back anyway (NETBOX-96).
+        Always a single request. The result carries NetBox's total `count`
+        next to the page (`results`) and the `limit`/`offset` actually
+        applied, so a caller can tell whether it has seen everything.
+        """
+        return self._page(get_model_spec(resource).rest_path, filters)
+
+    def list(
+        self,
+        resource: str,
+        filters: dict[str, Any] | None = None,
+        *,
+        paginate: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Return objects matching `filters`, one bounded page by default.
+
+        A single request is made, limited to `filters["limit"]` or
+        `DEFAULT_LIST_LIMIT`: a call with no `limit` used to follow every
+        `next` link and bring back the whole table (NETBOX-113). Pass
+        `paginate=True` to follow `next` on purpose — never from an MCP
+        tool, whose result must stay bounded.
         """
         spec = get_model_spec(resource)
-        results: list[dict[str, Any]] = []
-
-        response = self._request("GET", spec.rest_path, params=filters)
+        response = self._request("GET", spec.rest_path, params=_bounded_params(filters))
         payload = response.json()
-        results.extend(payload["results"])
+        results: list[dict[str, Any]] = list(payload["results"])
 
-        if filters and filters.get("limit") is not None:
-            return results
-
-        next_url = payload.get("next")
+        next_url = payload.get("next") if paginate else None
         while next_url:
             response = self._request("GET", next_url)
             payload = response.json()
@@ -157,9 +189,16 @@ class NetBoxRestClient:
 
         return results
 
-    def get(self, resource: str, object_id: int) -> dict[str, Any]:
+    def get(
+        self,
+        resource: str,
+        object_id: int,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         spec = get_model_spec(resource)
-        response = self._request("GET", f"{spec.rest_path}{object_id}/")
+        response = self._request(
+            "GET", f"{spec.rest_path}{object_id}/", params=params or None
+        )
         return response.json()
 
     def count(self, resource: str, filters: dict[str, Any] | None = None) -> int:
@@ -227,6 +266,16 @@ class NetBoxRestClient:
         self._request("DELETE", f"{spec.rest_path}{object_id}/")
 
     # -- Internals -------------------------------------------------------
+
+    def _page(self, path: str, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+        params = _bounded_params(filters)
+        payload = self._request("GET", path, params=params).json()
+        return {
+            "count": payload["count"],
+            "limit": params["limit"],
+            "offset": int(params.get("offset") or 0),
+            "results": payload["results"],
+        }
 
     def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         try:

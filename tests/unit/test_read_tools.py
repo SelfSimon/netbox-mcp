@@ -1,6 +1,8 @@
 import asyncio
+import json
 
 import httpx
+import pytest
 from fastmcp import FastMCP
 
 from client.config import ClientSettings
@@ -8,6 +10,7 @@ from client.rest import NetBoxRestClient
 from schemas.choices import DeviceStatus
 from schemas.filters import DeviceFilter, SiteFilter
 from tools import read
+from tools.response import ResponseTooLargeError
 
 
 def make_client(handler) -> NetBoxRestClient:
@@ -32,7 +35,120 @@ def test_list_sites_sends_filters_as_query_params(monkeypatch):
 
     monkeypatch.setattr(read, "_client", lambda: make_client(handler))
 
-    assert read.list_sites(SiteFilter(status="active")) == []
+    assert read.list_sites(SiteFilter(status="active")) == {
+        "count": 0,
+        "returned": 0,
+        "offset": 0,
+        "truncated": False,
+        "next_offset": None,
+        "results": [],
+    }
+
+
+def test_list_devices_reports_count_and_truncation(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "count": 300,
+                "next": "http://netbox.local/api/dcim/devices/?limit=2&offset=12",
+                "previous": None,
+                "results": [{"id": 1}, {"id": 2}],
+            },
+        )
+
+    monkeypatch.setattr(read, "_client", lambda: make_client(handler))
+
+    result = read.list_devices(DeviceFilter(limit=2, offset=10))
+
+    assert result["count"] == 300
+    assert result["returned"] == 2
+    assert result["truncated"] is True
+    assert result["next_offset"] == 12
+
+
+def test_list_devices_sends_brief_and_fields(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["brief"] == "true"
+        assert request.url.params["fields"] == "id,name"
+        return httpx.Response(
+            200, json={"count": 0, "next": None, "previous": None, "results": []}
+        )
+
+    monkeypatch.setattr(read, "_client", lambda: make_client(handler))
+
+    read.list_devices(DeviceFilter(brief=True, fields=["id", "name"]))
+
+
+def test_list_over_the_size_cap_is_truncated_and_stays_under_it(monkeypatch):
+    """NETBOX-116: 50 items is a bounded count, not a bounded size."""
+    devices = [{"id": i, "config_context": {"blob": "x" * 1000}} for i in range(50)]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"count": 50, "next": None, "previous": None, "results": devices},
+        )
+
+    monkeypatch.setenv("MCP_MAX_RESPONSE_BYTES", "10000")
+    monkeypatch.setattr(read, "_client", lambda: make_client(handler))
+
+    result = read.list_devices()
+
+    assert 0 < result["returned"] < 50
+    assert result["results"] == devices[: result["returned"]]
+    assert result["count"] == 50
+    assert result["truncated"] is True
+    assert result["next_offset"] == result["returned"]
+    assert "fields" in result["hint"]
+    assert len(json.dumps(result).encode()) <= 10000
+
+
+def test_list_whose_first_object_exceeds_the_cap_returns_none_with_a_hint(
+    monkeypatch,
+):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "count": 1,
+                "next": None,
+                "previous": None,
+                "results": [{"id": 1, "config_context": {"blob": "x" * 5000}}],
+            },
+        )
+
+    monkeypatch.setenv("MCP_MAX_RESPONSE_BYTES", "2000")
+    monkeypatch.setattr(read, "_client", lambda: make_client(handler))
+
+    result = read.list_devices()
+
+    assert result["results"] == []
+    assert result["truncated"] is True
+    assert "alone exceeds" in result["hint"]
+
+
+def test_get_device_over_the_size_cap_raises_an_explicit_error(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"id": 42, "config_context": {"blob": "x" * 5000}}
+        )
+
+    monkeypatch.setenv("MCP_MAX_RESPONSE_BYTES", "2000")
+    monkeypatch.setattr(read, "_client", lambda: make_client(handler))
+
+    with pytest.raises(ResponseTooLargeError, match="fields"):
+        read.get_device(42)
+
+
+def test_get_device_sends_field_selection(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["fields"] == "id,name"
+        return httpx.Response(200, json={"id": 42, "name": "sw01"})
+
+    monkeypatch.setattr(read, "_client", lambda: make_client(handler))
+
+    assert read.get_device(42, fields=["id", "name"]) == {"id": 42, "name": "sw01"}
 
 
 def test_list_sites_defaults_to_limit_fifty_when_omitted(monkeypatch):

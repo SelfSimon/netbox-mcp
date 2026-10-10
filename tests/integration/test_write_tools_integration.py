@@ -93,8 +93,9 @@ def test_create_branch_returns_a_ready_branch_with_schema_id():
 
 
 def test_list_branches_includes_a_freshly_created_branch(branch):
-    schema_ids = {b["schema_id"] for b in write.list_branches()}
-    assert branch in schema_ids
+    # Test branches accumulate in the target instance: take the largest page.
+    page = write.list_branches(limit=1000)
+    assert branch in {b["schema_id"] for b in page["results"]}
 
 
 def test_create_device_and_update_it_inside_a_branch(branch, device_prereqs):

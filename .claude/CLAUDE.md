@@ -12,9 +12,9 @@
 ## Architecture
 - `client/registry.py` — NetBox object type → REST path (`ModelSpec`);
   `get_model_spec()` raises `KeyError` on unknown resource.
-- `client/rest.py` — REST client; `list()` auto-paginates unless the
-  caller passes an explicit `limit`, in which case it returns that single
-  page as-is (NETBOX-96); maps HTTP errors to typed exceptions
+- `client/rest.py` — REST client; `list()`/`list_page()` make ONE bounded
+  request (default `limit` 50, max 1000) and only follow pagination with an
+  explicit `paginate=True` (NETBOX-113); maps HTTP errors to typed exceptions
   (`NetBoxConnectionError`/`PermissionError`/`NotFoundError`/
   `ValidationError`).
 - `client/branches.py` — branch lifecycle helpers (create/get/list/
@@ -26,6 +26,11 @@
 - `tools/generic.py` — `search_resources`/`get_resource`/`write_resource`,
   covering every resource in `client/registry.py` that has no dedicated
   tool; same `branch`/`main` rules as above.
+- `tools/response.py` — shared result shaping: every list tool returns the
+  envelope `{count, returned, offset, truncated, next_offset, results}`
+  (`list_response`), and every result is capped in size
+  (`MCP_MAX_RESPONSE_BYTES`, NETBOX-116). New tools must return through
+  `list_response`/`object_response`/`write_response`.
 - `src/netbox_mcp/auth.py` — per-request NetBox token pass-through
   (Starlette middleware + `ContextVar`), not full OAuth;
   no token → `401`, no service-account fallback.

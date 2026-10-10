@@ -48,18 +48,9 @@ def get_branch(client: NetBoxRestClient, branch_id: int) -> dict[str, Any]:
 
 def list_branches(
     client: NetBoxRestClient, filters: dict[str, Any] | None = None
-) -> list[dict[str, Any]]:
-    results: list[dict[str, Any]] = []
-    response = client._request("GET", _BRANCHES_PATH, params=filters)
-    payload = response.json()
-    results.extend(payload["results"])
-    next_url = payload.get("next")
-    while next_url:
-        response = client._request("GET", next_url)
-        payload = response.json()
-        results.extend(payload["results"])
-        next_url = payload.get("next")
-    return results
+) -> dict[str, Any]:
+    """Return one bounded page of branches (see `NetBoxRestClient.list_page`)."""
+    return client._page(_BRANCHES_PATH, filters)
 
 
 def wait_until_ready(

@@ -116,6 +116,15 @@ All notable changes to this project will be documented in this file.
   new tool) now also suggests close resource-name matches on an unknown
   name instead of only pointing to `search_resources()`.
 
+- `brief` and `fields` on every read (NETBOX-114). `brief=True` asks NetBox
+  for its minimal representation (id, url, display, name and a few key
+  fields — **no custom fields, tags or related objects**); `fields=[...]`
+  returns only the named fields. Both are on the shared `_FilterBase`
+  (`schemas/filters.py`), so every `list_*` filter has them, and are
+  parameters of the five `get_*` tools and of `get_resource`. They are sent
+  as plain NetBox query params; `fields` was verified against NetBox 4.6.2.
+  They are what makes a full inventory fit in one call.
+
 ### Fixed
 
 - `schemas/filters.py`'s `to_params()` serialized `status` filters (`str,
@@ -138,8 +147,36 @@ All notable changes to this project will be documented in this file.
   `ordering` were also added to `schemas/filters.py`'s shared
   `_FilterBase` (`limit` defaults to 50) so every dedicated `list_*` tool
   is bounded by default (NETBOX-96).
+- Lists are now bounded in the client, not per tool (NETBOX-113). NETBOX-96
+  only bounded the dedicated `list_*` tools: `get_resource` without a
+  `limit` in `filters`, and `list_branches`, still followed every `next`
+  link and returned whole tables. `NetBoxRestClient.list()` now makes a
+  single request with `limit=50` unless told otherwise, never more than
+  1000 objects (a missing, zero or larger `limit` is clamped), and follows
+  pagination only with an explicit `paginate=True`. `get_resource`,
+  `search_resources` and `list_branches` gained `limit`/`offset`.
+- No tool result can exceed the client's ~1 MB limit any more (NETBOX-116).
+  Bounding the number of objects was not enough — 50 devices with large
+  `config_context`/`custom_fields` can still exceed it. A new shared layer,
+  `tools/response.py`, caps the serialized size of every result at
+  `MCP_MAX_RESPONSE_BYTES` (default 400 000: FastMCP sends a dict result
+  both as text and as structured content, so this is about 800 kB on the
+  wire). A list over the cap is cut and says so; a single object over the
+  cap raises an explicit error pointing to `fields`/`brief`; an oversized
+  write result is reduced to `{id, url, display, truncated, hint}` since
+  the write itself succeeded.
 
 ### Changed
+
+- **Breaking:** every tool that returns a list — the five `list_*` tools,
+  `get_resource` without an `object_id`, `search_resources` and
+  `list_branches` — now returns an envelope instead of a bare list
+  (NETBOX-113/116): `{count, returned, offset, truncated, next_offset,
+  results}`, plus `hint` when the list was cut to fit the size cap. `count`
+  is NetBox's total, so a caller always knows whether it saw everything;
+  when `truncated` is true, call again with `offset=next_offset`.
+  `client/branches.py`'s `list_branches()` likewise returns one page
+  (`{count, limit, offset, results}`).
 
 - Dev tooling now uses Ruff alone: `ruff check --fix` (with the `I` rule for
   import sorting) and `ruff format` replace black and isort in

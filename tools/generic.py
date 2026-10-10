@@ -16,18 +16,33 @@ covered which way.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from client.config import get_settings
 from client.registry import get_model_spec, iter_model_specs
-from client.rest import NetBoxRestClient
+from client.rest import DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, NetBoxRestClient
 from netbox_mcp.auth import get_current_token
+from tools.response import (
+    list_response,
+    object_response,
+    selection_params,
+    write_response,
+)
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
+
+
+# The registry is a short static list: this default returns all of it in one
+# call while still keeping search_resources() bounded like every other list.
+_SEARCH_DEFAULT_LIMIT = 200
+
+_Limit = Annotated[int, Field(ge=1, le=MAX_LIST_LIMIT)]
+_Offset = Annotated[int, Field(ge=0)]
 
 
 def _client(branch: str | None = None) -> NetBoxRestClient:
@@ -53,7 +68,11 @@ def _validate_resource(resource: str) -> None:
         raise ValueError(f"Unknown resource {resource!r} — {hint}") from None
 
 
-def search_resources(query: str = "") -> list[dict[str, str]]:
+def search_resources(
+    query: str = "",
+    limit: _Limit = _SEARCH_DEFAULT_LIMIT,
+    offset: _Offset = 0,
+) -> dict[str, Any]:
     """List NetBox resource types registered in client/registry.py,
     optionally narrowed by a substring `query` matched against the
     resource name and its NetBox label (case-insensitive).
@@ -62,6 +81,9 @@ def search_resources(query: str = "") -> list[dict[str, str]]:
     write_resource() when no dedicated tool covers the object type you
     need (dedicated tools: site, device, interface, ip_address, vlan —
     prefer those when they apply).
+
+    Returns `{count, returned, offset, truncated, next_offset, results}`;
+    the default `limit` covers the whole registry in one call.
     """
     needle = query.strip().lower()
     matches = []
@@ -72,27 +94,53 @@ def search_resources(query: str = "") -> list[dict[str, str]]:
         matches.append(
             {"resource": name, "label": spec.label, "rest_path": spec.rest_path}
         )
-    return matches
+    return list_response(
+        {
+            "count": len(matches),
+            "offset": offset,
+            "results": matches[offset : offset + limit],
+        }
+    )
 
 
 def get_resource(
     resource: str,
     object_id: int | None = None,
     filters: dict[str, Any] | None = None,
+    limit: _Limit = DEFAULT_LIST_LIMIT,
+    offset: _Offset = 0,
+    brief: bool = False,
+    fields: list[str] | None = None,
 ) -> Any:
     """Read a NetBox object of any resource type registered in
     client/registry.py (see search_resources() for valid names).
 
     Pass `object_id` to fetch a single object; otherwise `filters` (raw
     NetBox REST query params, e.g. {"name": "dc1"}) narrows a list, or
-    omit both to list everything. Always targets `main` — no branch
+    omit both to list the first page. Always targets `main` — no branch
     scoping, same as the dedicated read tools.
+
+    A list is returned as `{count, returned, offset, truncated,
+    next_offset, results}`: `count` is the total matching in NetBox, and
+    `truncated` means there is more — continue from `next_offset`. It
+    holds at most `limit` objects (default 50, max 1000), never the whole
+    table.
+
+    `brief=True` returns NetBox's minimal representation (id, url,
+    display, name and a few key fields — no custom fields, tags or related
+    objects); `fields` (e.g. ["id", "name", "status"]) returns only the
+    fields you name. Use one of them to inventory many objects in a single
+    call.
     """
     _validate_resource(resource)
+    selection = selection_params(brief, fields)
     with _client() as client:
         if object_id is not None:
-            return client.get(resource, object_id)
-        return client.list(resource, filters)
+            return object_response(client.get(resource, object_id, selection))
+        params = {"limit": limit, **(filters or {}), **selection}
+        if offset:
+            params.setdefault("offset", offset)
+        return list_response(client.list_page(resource, params))
 
 
 def get_resource_schema(resource: str) -> dict[str, Any]:
@@ -111,7 +159,9 @@ def get_resource_schema(resource: str) -> dict[str, Any]:
     """
     _validate_resource(resource)
     with _client() as client:
-        return client.schema(resource)
+        return object_response(
+            client.schema(resource), hint="this schema cannot be returned in full"
+        )
 
 
 def write_resource(
@@ -154,11 +204,15 @@ def write_resource(
 
     with _client(branch) as client:
         if action == "create":
-            return client.create(resource, data or {})
+            return write_response(client.create(resource, data or {}))
         if action == "update":
-            return client.update(resource, object_id, data or {})  # type: ignore[arg-type]
+            return write_response(
+                client.update(resource, object_id, data or {})  # type: ignore[arg-type]
+            )
         if action == "patch":
-            return client.patch(resource, object_id, data or {})  # type: ignore[arg-type]
+            return write_response(
+                client.patch(resource, object_id, data or {})  # type: ignore[arg-type]
+            )
         client.delete(resource, object_id)  # type: ignore[arg-type]
         return None
 
