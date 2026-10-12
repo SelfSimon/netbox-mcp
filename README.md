@@ -101,7 +101,7 @@ registration point) — every create/update tool requires an active branch,
 and merge stays a human-only action in the NetBox UI.
 
 Every other NetBox object type registered in `client/registry.py`
-(~130 resources across DCIM, IPAM, virtualization, circuits, tenancy,
+(98 of its 103 resources, across DCIM, IPAM, virtualization, circuits, tenancy,
 wireless, VPN, extras, and users/core) is reachable through four generic
 tools instead of a dedicated one per object: `search_resources`,
 `get_resource`, `get_resource_schema`, and `write_resource`
