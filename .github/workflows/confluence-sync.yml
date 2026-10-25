@@ -15,7 +15,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Any markdown file becomes a sync target just by adding a
       # `confluence-sync: true` front-matter header — no workflow edit
