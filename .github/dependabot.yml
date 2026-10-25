@@ -1,0 +1,21 @@
+# Version bumps land on `development`, like any other change, and reach
+# `main` with the next merge. fastmcp and mcp are bounded to one major
+# version (NETBOX-119): Dependabot widens the bound in its own PR when a
+# new major comes out, so it never installs without an explicit change.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    target-branch: development
+    schedule:
+      interval: weekly
+    groups:
+      # Minor and patch bumps in one PR; each major bump stays separate.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: development
+    schedule:
+      interval: weekly

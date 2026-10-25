@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
   version; the `0.1.0` image already shipped fastmcp 4.1.0 / mcp 2.3.0
   despite the FastMCP 3.x note below. A new major version now needs an
   explicit change in the repo.
+- Dependabot (`.github/dependabot.yml`) opens weekly PRs against
+  `development` for pip and GitHub Actions updates; minor and patch bumps
+  are grouped, each major bump gets its own PR (NETBOX-119).
 - `ToolAnnotations` use the MCP SDK v2 field names (`read_only_hint`,
   `destructive_hint`, `idempotent_hint`); the wire format is unchanged.
 
