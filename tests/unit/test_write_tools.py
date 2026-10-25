@@ -245,8 +245,8 @@ def test_create_tools_are_not_destructive_and_not_idempotent():
         "assign_ip_address",
         "create_branch",
     ):
-        assert tools_by_name[name].annotations.destructiveHint is False
-        assert tools_by_name[name].annotations.idempotentHint is False
+        assert tools_by_name[name].annotations.destructive_hint is False
+        assert tools_by_name[name].annotations.idempotent_hint is False
 
 
 def test_update_tools_are_destructive_and_idempotent():
@@ -255,8 +255,8 @@ def test_update_tools_are_destructive_and_idempotent():
     tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
     for name in ("update_device", "update_interface"):
-        assert tools_by_name[name].annotations.destructiveHint is True
-        assert tools_by_name[name].annotations.idempotentHint is True
+        assert tools_by_name[name].annotations.destructive_hint is True
+        assert tools_by_name[name].annotations.idempotent_hint is True
 
 
 def test_list_branches_is_read_only():
@@ -264,5 +264,5 @@ def test_list_branches_is_read_only():
     write.register(mcp)
     tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
-    assert tools_by_name["list_branches"].annotations.readOnlyHint is True
-    assert tools_by_name["list_branches"].annotations.idempotentHint is True
+    assert tools_by_name["list_branches"].annotations.read_only_hint is True
+    assert tools_by_name["list_branches"].annotations.idempotent_hint is True

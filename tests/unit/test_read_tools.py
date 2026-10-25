@@ -292,6 +292,6 @@ def test_register_adds_all_read_tools():
         "get_vlan",
     }
     assert all(
-        tool.annotations.readOnlyHint and tool.annotations.idempotentHint
+        tool.annotations.read_only_hint and tool.annotations.idempotent_hint
         for tool in tools
     )

@@ -18,8 +18,7 @@ def test_initialize_returns_the_server_instructions():
         async with Client(mcp) as client:
             # fastmcp 4 negotiates a protocol with no InitializeResult and
             # exposes the instructions on the client itself.
-            result = client.initialize_result
-            return result.instructions if result else client.instructions
+            return client.instructions
 
     instructions = asyncio.run(initialize())
 

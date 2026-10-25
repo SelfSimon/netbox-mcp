@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- `fastmcp` and `mcp` are bounded to one major version, `fastmcp>=4.1,<5`
+  and `mcp>=2.3,<3`, in both `pyproject.toml` and `requirements.txt`
+  (NETBOX-119). Local dev, CI and the image now install the same major
+  version; the `0.1.0` image already shipped fastmcp 4.1.0 / mcp 2.3.0
+  despite the FastMCP 3.x note below. A new major version now needs an
+  explicit change in the repo.
+- `ToolAnnotations` use the MCP SDK v2 field names (`read_only_hint`,
+  `destructive_hint`, `idempotent_hint`); the wire format is unchanged.
+
 ## [0.1.0] - 2026-10-09
 
 First release. It describes what the image ships, not the steps taken to
