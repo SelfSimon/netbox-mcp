@@ -217,9 +217,9 @@ def write_resource(
         return None
 
 
-_SEARCH_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
-_GET_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
-_WRITE_ANNOTATIONS = ToolAnnotations(destructiveHint=True, idempotentHint=False)
+_SEARCH_ANNOTATIONS = ToolAnnotations(read_only_hint=True, idempotent_hint=True)
+_GET_ANNOTATIONS = ToolAnnotations(read_only_hint=True, idempotent_hint=True)
+_WRITE_ANNOTATIONS = ToolAnnotations(destructive_hint=True, idempotent_hint=False)
 
 
 def register(mcp: FastMCP) -> None:

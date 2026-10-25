@@ -347,8 +347,8 @@ def test_search_and_get_tools_are_read_only():
     tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
     for name in ("search_resources", "get_resource", "get_resource_schema"):
-        assert tools_by_name[name].annotations.readOnlyHint is True
-        assert tools_by_name[name].annotations.idempotentHint is True
+        assert tools_by_name[name].annotations.read_only_hint is True
+        assert tools_by_name[name].annotations.idempotent_hint is True
 
 
 def test_write_resource_tool_is_destructive_and_not_idempotent():
@@ -356,8 +356,8 @@ def test_write_resource_tool_is_destructive_and_not_idempotent():
     generic.register(mcp)
     tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
-    assert tools_by_name["write_resource"].annotations.destructiveHint is True
-    assert tools_by_name["write_resource"].annotations.idempotentHint is False
+    assert tools_by_name["write_resource"].annotations.destructive_hint is True
+    assert tools_by_name["write_resource"].annotations.idempotent_hint is False
 
 
 def test_validate_resource_suggests_close_matches_for_unknown_resource():

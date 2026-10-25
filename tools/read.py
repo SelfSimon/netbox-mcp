@@ -203,7 +203,7 @@ _READ_TOOLS = (
 )
 
 
-_READ_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
+_READ_ANNOTATIONS = ToolAnnotations(read_only_hint=True, idempotent_hint=True)
 
 
 def register(mcp: FastMCP) -> None:

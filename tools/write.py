@@ -146,9 +146,9 @@ def list_branches(
         return list_response(branch_client.list_branches(client, params))
 
 
-_CREATE_ANNOTATIONS = ToolAnnotations(destructiveHint=False, idempotentHint=False)
-_UPDATE_ANNOTATIONS = ToolAnnotations(destructiveHint=True, idempotentHint=True)
-_BRANCH_LIST_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
+_CREATE_ANNOTATIONS = ToolAnnotations(destructive_hint=False, idempotent_hint=False)
+_UPDATE_ANNOTATIONS = ToolAnnotations(destructive_hint=True, idempotent_hint=True)
+_BRANCH_LIST_ANNOTATIONS = ToolAnnotations(read_only_hint=True, idempotent_hint=True)
 
 _WRITE_TOOLS = (
     (create_device, _CREATE_ANNOTATIONS),
