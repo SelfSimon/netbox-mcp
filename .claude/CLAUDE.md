@@ -79,7 +79,7 @@
 - `netbox_branching` branches are write-only from MCP: no `merge()`/`sync()`/
   `revert()`/`archive()` by design — merging into `main` is a human action in
   the NetBox UI. Do not add these.
-- Only 5 of ~130 registered resources (site, device, interface, ip_address,
+- Only 5 of the 103 registered resources (site, device, interface, ip_address,
   vlan) have dedicated schemas + tools; everything else in
   `client/registry.py` is reachable generically via `tools/generic.py`
   (`search_resources`/`get_resource`/`write_resource` — no per-object
