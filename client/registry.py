@@ -73,6 +73,34 @@ _REGISTRY: dict[str, ModelSpec] = {
     "front_port": ModelSpec("dcim/front-ports/", "Front port"),
     "rear_port": ModelSpec("dcim/rear-ports/", "Rear port"),
     "cable": ModelSpec("dcim/cables/", "Cable"),
+    # Component templates: defined once on a device type / module type,
+    # instantiated by NetBox on every new device / module of that type.
+    "console_port_template": ModelSpec(
+        "dcim/console-port-templates/", "Console port template"
+    ),
+    "console_server_port_template": ModelSpec(
+        "dcim/console-server-port-templates/", "Console server port template"
+    ),
+    "power_port_template": ModelSpec(
+        "dcim/power-port-templates/", "Power port template"
+    ),
+    "power_outlet_template": ModelSpec(
+        "dcim/power-outlet-templates/", "Power outlet template"
+    ),
+    "interface_template": ModelSpec("dcim/interface-templates/", "Interface template"),
+    "front_port_template": ModelSpec(
+        "dcim/front-port-templates/", "Front port template"
+    ),
+    "rear_port_template": ModelSpec("dcim/rear-port-templates/", "Rear port template"),
+    "module_bay_template": ModelSpec(
+        "dcim/module-bay-templates/", "Module bay template"
+    ),
+    "device_bay_template": ModelSpec(
+        "dcim/device-bay-templates/", "Device bay template"
+    ),
+    "inventory_item_template": ModelSpec(
+        "dcim/inventory-item-templates/", "Inventory item template"
+    ),
     # -- IPAM --------------------------------------------------------------
     "vrf": ModelSpec("ipam/vrfs/", "VRF"),
     "route_target": ModelSpec("ipam/route-targets/", "Route target"),

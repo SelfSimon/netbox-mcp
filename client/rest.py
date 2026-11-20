@@ -74,6 +74,23 @@ def _simplify_reference(field: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _is_inline_object(field: dict[str, Any]) -> bool:
+    """A nested object with no id/slug/name is a value written inline
+    (e.g. a front port's `rear_ports` mappings), not a reference to
+    another NetBox object."""
+    children = field.get("children", {})
+    return not any(key in children for key in ("id", "slug", "name"))
+
+
+def _simplify_children(field: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for name, child in field.get("children", {}).items():
+        simplified = _simplify_field(child)
+        if simplified is not None:
+            result[name] = simplified
+    return result
+
+
 def _simplify_field(field: dict[str, Any]) -> dict[str, Any] | None:
     """Reduce one raw DRF OPTIONS field to what write_resource() needs.
 
@@ -83,10 +100,24 @@ def _simplify_field(field: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     if field.get("type") == "nested object":
+        if _is_inline_object(field):
+            return {
+                "type": "object",
+                "required": field.get("required", False),
+                "label": field.get("label", ""),
+                "fields": _simplify_children(field),
+            }
         return _simplify_reference(field)
 
     child = field.get("child")
     if isinstance(child, dict) and child.get("type") == "nested object":
+        if _is_inline_object(child):
+            return {
+                "type": "list[object]",
+                "required": field.get("required", False),
+                "label": field.get("label", ""),
+                "fields": _simplify_children(child),
+            }
         reference = _simplify_reference(child)
         return {
             "type": "list[reference]",

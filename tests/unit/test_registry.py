@@ -20,3 +20,22 @@ def test_get_model_spec_returns_expected_fields():
 def test_get_model_spec_raises_key_error_for_unknown_resource():
     with pytest.raises(KeyError):
         get_model_spec("not-a-real-resource")
+
+
+COMPONENT_TEMPLATES = {
+    "console_port_template": "dcim/console-port-templates/",
+    "console_server_port_template": "dcim/console-server-port-templates/",
+    "device_bay_template": "dcim/device-bay-templates/",
+    "front_port_template": "dcim/front-port-templates/",
+    "interface_template": "dcim/interface-templates/",
+    "inventory_item_template": "dcim/inventory-item-templates/",
+    "module_bay_template": "dcim/module-bay-templates/",
+    "power_outlet_template": "dcim/power-outlet-templates/",
+    "power_port_template": "dcim/power-port-templates/",
+    "rear_port_template": "dcim/rear-port-templates/",
+}
+
+
+@pytest.mark.parametrize(("resource", "rest_path"), COMPONENT_TEMPLATES.items())
+def test_every_component_template_is_registered(resource, rest_path):
+    assert get_model_spec(resource).rest_path == rest_path

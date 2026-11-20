@@ -42,6 +42,24 @@ def test_search_resources_filters_by_name_or_label_case_insensitively():
     assert result["count"] == 4
 
 
+def test_search_resources_finds_every_component_template():
+    result = generic.search_resources("template")
+
+    resource_names = {r["resource"] for r in result["results"]}
+    assert {
+        "console_port_template",
+        "console_server_port_template",
+        "device_bay_template",
+        "front_port_template",
+        "interface_template",
+        "inventory_item_template",
+        "module_bay_template",
+        "power_outlet_template",
+        "power_port_template",
+        "rear_port_template",
+    } <= resource_names
+
+
 def test_search_resources_matches_label_not_just_resource_name():
     result = generic.search_resources("VRF")
 

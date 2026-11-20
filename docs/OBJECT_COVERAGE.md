@@ -72,7 +72,16 @@ enough that a dedicated tool becomes the exception rather than the norm.
 | Front port | `dcim/front-ports/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Rear port | `dcim/rear-ports/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Cable | `dcim/cables/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Device/module/template bays & port templates | `dcim/*-templates/` | ⬜ | ⬜ | ⬜ | ⬜ |
+| Console port template | `dcim/console-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Console server port template | `dcim/console-server-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Power port template | `dcim/power-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Power outlet template | `dcim/power-outlet-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Interface template | `dcim/interface-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Front port template | `dcim/front-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Rear port template | `dcim/rear-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Module bay template | `dcim/module-bay-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Device bay template | `dcim/device-bay-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Inventory item template | `dcim/inventory-item-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
 
 ## IPAM
 

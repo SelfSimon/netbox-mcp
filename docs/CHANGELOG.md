@@ -9,6 +9,20 @@ All notable changes to this project will be documented in this file.
 - `list_devices` accepts the `rack_id` and `location_id` filters
   (NETBOX-140). `location_id` also matches devices in child locations,
   like NetBox's own filter.
+- The 10 component templates (`dcim/*-templates/`: console port, console
+  server port, power port, power outlet, interface, front port, rear port,
+  module bay, device bay, inventory item) are in the registry, so the
+  generic tools reach them (NETBOX-137). A device type gets its components
+  once, and NetBox creates them on every new device of that type, also
+  inside a branch. The registry now holds 113 resources.
+
+### Fixed
+
+- `get_resource_schema` exposes the fields of inline nested objects
+  instead of an empty `reference_by` (NETBOX-137). Front/rear port
+  mappings (`rear_ports` / `front_ports`, NetBox 4.5+) and cable
+  `a_terminations` / `b_terminations` now show the expected shape, e.g.
+  `[{position, rear_port, rear_port_position}]`.
 
 ### Changed
 
