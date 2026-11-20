@@ -25,11 +25,12 @@ from .config import ClientSettings, get_settings
 from .exceptions import (
     NetBoxConnectionError,
     NetBoxNoBranchError,
+    NetBoxNotBranchableError,
     NetBoxNotFoundError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
-from .registry import get_model_spec
+from .registry import ModelSpec, get_model_spec
 
 BRANCH_HEADER = "X-NetBox-Branch"
 
@@ -54,6 +55,16 @@ def _bounded_params(filters: dict[str, Any] | None) -> dict[str, Any]:
         limit = MAX_LIST_LIMIT
     params["limit"] = int(limit)
     return params
+
+
+def not_branchable_message(resource: str, spec: ModelSpec, netbox_url: str) -> str:
+    """Why `resource` cannot be written, and where to do it by hand."""
+    return (
+        f"{spec.label!r} ({resource}) cannot be written through this MCP: "
+        "netbox_branching does not version it, so the write would land "
+        "directly on main with no review. Ask the user to create or change "
+        f"it manually in the NetBox UI: {netbox_url}/{spec.rest_path}"
+    )
 
 
 def _safe_json(response: httpx.Response) -> dict[str, Any]:
@@ -260,7 +271,7 @@ class NetBoxRestClient:
     # -- Write ---------------------------------------------------------
 
     def create(self, resource: str, data: dict[str, Any]) -> dict[str, Any]:
-        spec = get_model_spec(resource)
+        spec = self._writable_spec(resource)
         response = self._request("POST", spec.rest_path, json=data)
         return response.json()
 
@@ -268,7 +279,7 @@ class NetBoxRestClient:
         self, resource: str, object_id: int, data: dict[str, Any]
     ) -> dict[str, Any]:
         """Full replacement (PUT) of the `object_id` object."""
-        spec = get_model_spec(resource)
+        spec = self._writable_spec(resource)
         response = self._request("PUT", f"{spec.rest_path}{object_id}/", json=data)
         return response.json()
 
@@ -276,7 +287,7 @@ class NetBoxRestClient:
         self, resource: str, object_id: int, data: dict[str, Any]
     ) -> dict[str, Any]:
         """Partial update (PATCH) of the `object_id` object."""
-        spec = get_model_spec(resource)
+        spec = self._writable_spec(resource)
         response = self._request("PATCH", f"{spec.rest_path}{object_id}/", json=data)
         return response.json()
 
@@ -288,15 +299,25 @@ class NetBoxRestClient:
         review gate, which this client never allows. Raises
         NetBoxNoBranchError before any request is sent if no branch is set.
         """
+        spec = self._writable_spec(resource)
         if not self._branch:
             raise NetBoxNoBranchError(
                 "delete() requires an active netbox_branching branch; "
                 "direct writes to main are not allowed"
             )
-        spec = get_model_spec(resource)
         self._request("DELETE", f"{spec.rest_path}{object_id}/")
 
     # -- Internals -------------------------------------------------------
+
+    def _writable_spec(self, resource: str) -> ModelSpec:
+        """The resource's spec, or NetBoxNotBranchableError when
+        netbox_branching would send the write straight to main."""
+        spec = get_model_spec(resource)
+        if not spec.branchable:
+            raise NetBoxNotBranchableError(
+                not_branchable_message(resource, spec, self._settings.netbox_url)
+            )
+        return spec
 
     def _page(self, path: str, filters: dict[str, Any] | None = None) -> dict[str, Any]:
         params = _bounded_params(filters)

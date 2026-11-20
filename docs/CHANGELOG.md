@@ -31,6 +31,19 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Writes no longer reach `main` through resources netbox_branching does
+  not version (NETBOX-142). The plugin ignores `X-NetBox-Branch` for
+  models without change logging or exempted by it, so an `owner` created
+  "in a branch" landed directly on main. The 19 such resources (`user`,
+  `group`, `permission`, `token`, `owner`, `owner_group`, `custom_field`,
+  `custom_field_choice_set`, `custom_link`, `export_template`,
+  `saved_filter`, `bookmark`, `script`, `webhook`, `event_rule`,
+  `notification_group`, `data_source`, `data_file`, `job`) are marked
+  `branchable=False` in the registry: the client refuses every write to
+  them before any request, `write_resource` and `get_resource_schema`
+  say to create or change them in the NetBox UI, and `search_resources`
+  returns `writable: false`. Reads are unchanged. An integration test
+  checks the list against the live `branching` object-type feature.
 - `get_resource_schema` exposes the fields of inline nested objects
   instead of an empty `reference_by` (NETBOX-137). Front/rear port
   mappings (`rear_ports` / `front_ports`, NetBox 4.5+) and cable

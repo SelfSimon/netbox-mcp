@@ -20,6 +20,7 @@ import pytest
 
 from client.branches import create_branch, wait_until_ready
 from client.exceptions import NetBoxNoBranchError, NetBoxValidationError
+from client.registry import iter_model_specs
 from client.rest import NetBoxRestClient
 
 pytestmark = pytest.mark.integration
@@ -84,3 +85,23 @@ def test_delete_inside_a_branch_succeeds():
 
     with NetBoxRestClient(branch=branch["schema_id"]) as branch_client:
         assert branch_client.list("site", filters={"slug": slug}) == []
+
+
+def test_registry_branchable_flags_match_netbox_branching():
+    """NETBOX-142: `branchable` must match what netbox_branching actually
+    versions on this instance (the `branching` object-type feature, which
+    also reflects the plugin's `exempt_models` setting)."""
+    with NetBoxRestClient() as rest_client:
+        object_types = rest_client._request(
+            "GET", "core/object-types/", params={"limit": 1000}
+        ).json()["results"]
+
+    branching_endpoints = {
+        o["rest_api_endpoint"] for o in object_types if "branching" in o["features"]
+    }
+    mismatches = {
+        name: spec.branchable
+        for name, spec in iter_model_specs()
+        if spec.branchable != (f"/api/{spec.rest_path}" in branching_endpoints)
+    }
+    assert mismatches == {}

@@ -5,6 +5,7 @@ from client.config import ClientSettings
 from client.exceptions import (
     NetBoxConnectionError,
     NetBoxNoBranchError,
+    NetBoxNotBranchableError,
     NetBoxNotFoundError,
     NetBoxPermissionError,
     NetBoxValidationError,
@@ -770,3 +771,32 @@ def test_schema_exposes_fields_of_inline_nested_objects():
             },
         },
     }
+
+
+@pytest.mark.parametrize(
+    ("method", "args"),
+    [
+        ("create", ("owner", {"name": "x"})),
+        ("update", ("owner", 1, {"name": "x"})),
+        ("patch", ("owner", 1, {"name": "x"})),
+        ("delete", ("owner", 1)),
+    ],
+)
+def test_writes_to_a_non_branchable_resource_are_refused_before_any_request(
+    method, args
+):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request may reach NetBox")
+
+    client = make_client(handler, branch="br1")
+
+    with pytest.raises(NetBoxNotBranchableError, match="NetBox UI"):
+        getattr(client, method)(*args)
+
+
+def test_reads_of_a_non_branchable_resource_still_work():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/users/owners/1/"
+        return httpx.Response(200, json={"id": 1, "name": "Nord Quantique"})
+
+    assert make_client(handler).get("owner", 1)["name"] == "Nord Quantique"

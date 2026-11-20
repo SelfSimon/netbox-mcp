@@ -13,7 +13,8 @@ enough to make it usable through the generic `search_resources`/
 only needs a dedicated tool (`tools/read.py`/`tools/write.py`) and Pydantic
 schemas once it's high-usage enough to warrant precise validation and
 per-action MCP annotations (currently: site, device, interface, ip_address,
-vlan). See docs/OBJECT_COVERAGE.md for tracking.
+vlan). Resources marked `branchable=False` are read-only through the MCP.
+See docs/OBJECT_COVERAGE.md for tracking.
 """
 
 from __future__ import annotations
@@ -27,10 +28,18 @@ class ModelSpec:
 
     rest_path: NetBox REST API path, relative to /api/ (e.g. "dcim/devices/").
     label: human-readable NetBox name, surfaced by search_resources().
+    branchable: False when netbox_branching does not version the model (no
+        change logging, or exempted by the plugin). The plugin ignores
+        `X-NetBox-Branch` for these, so a write would land directly on
+        `main`: the client refuses every write to them (NETBOX-142) and
+        they are created by hand in the NetBox UI. Reads are unaffected.
+        Checked against a live NetBox by
+        tests/integration/test_rest_integration.py.
     """
 
     rest_path: str
     label: str
+    branchable: bool = True
 
 
 _REGISTRY: dict[str, ModelSpec] = {
@@ -168,35 +177,41 @@ _REGISTRY: dict[str, ModelSpec] = {
     "l2vpn_termination": ModelSpec("vpn/l2vpn-terminations/", "L2VPN termination"),
     # -- Extras --------------------------------------------------------------
     "tag": ModelSpec("extras/tags/", "Tag"),
-    "custom_field": ModelSpec("extras/custom-fields/", "Custom field"),
-    "custom_field_choice_set": ModelSpec(
-        "extras/custom-field-choice-sets/", "Custom field choice set"
+    "custom_field": ModelSpec(
+        "extras/custom-fields/", "Custom field", branchable=False
     ),
-    "custom_link": ModelSpec("extras/custom-links/", "Custom link"),
+    "custom_field_choice_set": ModelSpec(
+        "extras/custom-field-choice-sets/", "Custom field choice set", branchable=False
+    ),
+    "custom_link": ModelSpec("extras/custom-links/", "Custom link", branchable=False),
     "config_context": ModelSpec("extras/config-contexts/", "Config context"),
     "config_template": ModelSpec("extras/config-templates/", "Config template"),
-    "export_template": ModelSpec("extras/export-templates/", "Export template"),
-    "saved_filter": ModelSpec("extras/saved-filters/", "Saved filter"),
-    "webhook": ModelSpec("extras/webhooks/", "Webhook"),
-    "event_rule": ModelSpec("extras/event-rules/", "Event rule"),
+    "export_template": ModelSpec(
+        "extras/export-templates/", "Export template", branchable=False
+    ),
+    "saved_filter": ModelSpec(
+        "extras/saved-filters/", "Saved filter", branchable=False
+    ),
+    "webhook": ModelSpec("extras/webhooks/", "Webhook", branchable=False),
+    "event_rule": ModelSpec("extras/event-rules/", "Event rule", branchable=False),
     "notification_group": ModelSpec(
-        "extras/notification-groups/", "Notification group"
+        "extras/notification-groups/", "Notification group", branchable=False
     ),
     "journal_entry": ModelSpec("extras/journal-entries/", "Journal entry"),
     "image_attachment": ModelSpec("extras/image-attachments/", "Image attachment"),
-    "bookmark": ModelSpec("extras/bookmarks/", "Bookmark"),
-    "script": ModelSpec("extras/scripts/", "Script"),
+    "bookmark": ModelSpec("extras/bookmarks/", "Bookmark", branchable=False),
+    "script": ModelSpec("extras/scripts/", "Script", branchable=False),
     # -- Users / core --------------------------------------------------------
-    "user": ModelSpec("users/users/", "User"),
-    "group": ModelSpec("users/groups/", "Group"),
-    "permission": ModelSpec("users/permissions/", "Permission"),
-    "token": ModelSpec("users/tokens/", "Token"),
+    "user": ModelSpec("users/users/", "User", branchable=False),
+    "group": ModelSpec("users/groups/", "Group", branchable=False),
+    "permission": ModelSpec("users/permissions/", "Permission", branchable=False),
+    "token": ModelSpec("users/tokens/", "Token", branchable=False),
     # Ownership (NetBox 4.5+): the `owner` field on devices and other objects.
-    "owner": ModelSpec("users/owners/", "Owner"),
-    "owner_group": ModelSpec("users/owner-groups/", "Owner group"),
-    "data_source": ModelSpec("core/data-sources/", "Data source"),
-    "data_file": ModelSpec("core/data-files/", "Data file"),
-    "job": ModelSpec("core/jobs/", "Job"),
+    "owner": ModelSpec("users/owners/", "Owner", branchable=False),
+    "owner_group": ModelSpec("users/owner-groups/", "Owner group", branchable=False),
+    "data_source": ModelSpec("core/data-sources/", "Data source", branchable=False),
+    "data_file": ModelSpec("core/data-files/", "Data file", branchable=False),
+    "job": ModelSpec("core/jobs/", "Job", branchable=False),
 }
 
 

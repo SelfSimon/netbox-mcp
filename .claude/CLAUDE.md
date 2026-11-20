@@ -85,3 +85,9 @@
   (`search_resources`/`get_resource`/`write_resource` — no per-object
   Pydantic schema, NetBox's own REST API validates). Check
   `docs/OBJECT_COVERAGE.md` before assuming a resource has a dedicated tool.
+- `ModelSpec(branchable=False)` marks the 19 resources netbox_branching
+  does not version (users/*, core/*, custom fields, webhooks, ...): it
+  ignores `X-NetBox-Branch` for them, so the client refuses every write
+  (NETBOX-142). A newly registered resource must be checked —
+  `pytest -m integration -k branchable` compares the registry with the
+  live `branching` object-type feature.

@@ -24,7 +24,12 @@ from pydantic import Field
 
 from client.config import get_settings
 from client.registry import get_model_spec, iter_model_specs
-from client.rest import DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, NetBoxRestClient
+from client.rest import (
+    DEFAULT_LIST_LIMIT,
+    MAX_LIST_LIMIT,
+    NetBoxRestClient,
+    not_branchable_message,
+)
 from netbox_mcp.auth import get_current_token
 from tools.response import (
     list_response,
@@ -68,6 +73,16 @@ def _validate_resource(resource: str) -> None:
         raise ValueError(f"Unknown resource {resource!r} — {hint}") from None
 
 
+def _validate_writable(resource: str) -> None:
+    """Refuse resources netbox_branching does not version (NETBOX-142): a
+    write would reach main directly, so they are created by hand."""
+    spec = get_model_spec(resource)
+    if not spec.branchable:
+        raise ValueError(
+            not_branchable_message(resource, spec, get_settings().netbox_url)
+        )
+
+
 def search_resources(
     query: str = "",
     limit: _Limit = _SEARCH_DEFAULT_LIMIT,
@@ -82,6 +97,11 @@ def search_resources(
     need (dedicated tools: site, device, interface, ip_address, vlan —
     prefer those when they apply).
 
+    `writable` is false for the resources netbox_branching does not
+    version (users, groups, permissions, tokens, owners, custom fields,
+    webhooks, event rules, ...): they can be read, but write_resource()
+    refuses them — the user creates or changes them in the NetBox UI.
+
     Returns `{count, returned, offset, truncated, next_offset, results}`;
     the default `limit` covers the whole registry in one call.
     """
@@ -92,7 +112,12 @@ def search_resources(
         if needle and needle not in haystack:
             continue
         matches.append(
-            {"resource": name, "label": spec.label, "rest_path": spec.rest_path}
+            {
+                "resource": name,
+                "label": spec.label,
+                "rest_path": spec.rest_path,
+                "writable": spec.branchable,
+            }
         )
     return list_response(
         {
@@ -156,8 +181,11 @@ def get_resource_schema(resource: str) -> dict[str, Any]:
     (site, device, interface, ip_address, vlan already have precise
     Pydantic schemas and don't need this). Always targets `main`, same as
     get_resource()/search_resources() — no branch scoping.
+
+    Refused for resources search_resources() marks `writable: false`.
     """
     _validate_resource(resource)
+    _validate_writable(resource)
     with _client() as client:
         return object_response(
             client.schema(resource), hint="this schema cannot be returned in full"
@@ -193,8 +221,14 @@ def write_resource(
 
     `action="delete"` additionally requires `confirm=True` — it is
     rejected otherwise. `create`/`update`/`patch` ignore `confirm`.
+
+    Resources marked `writable: false` by search_resources() are refused
+    for every action: netbox_branching does not version them, so the
+    write would land directly on main. Tell the user to create or change
+    them manually in the NetBox UI.
     """
     _validate_resource(resource)
+    _validate_writable(resource)
     if action != "create" and object_id is None:
         raise ValueError(f"object_id is required for action={action!r}")
     if action == "delete" and not confirm:

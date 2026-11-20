@@ -107,7 +107,11 @@ tools instead of a dedicated one per object: `search_resources`,
 `get_resource`, `get_resource_schema`, and `write_resource`
 (`tools/generic.py`) — `get_resource_schema` discovers a resource's
 required/optional fields and valid values before you call `write_resource`
-on it. A resource only graduates to a dedicated tool once it's high-usage
+on it. 19 of them (users, groups, permissions, tokens, owners, custom
+fields, webhooks, event rules, core objects, ...) are read-only through
+the MCP: netbox_branching does not version them, so a write would land
+directly on `main` — create or change them in the NetBox UI
+(NETBOX-142). A resource only graduates to a dedicated tool once it's high-usage
 enough to warrant a precise Pydantic schema and per-action MCP
 annotations — see
 [docs/OBJECT_COVERAGE.md](https://github.com/SelfSimon/netbox-mcp/blob/main/docs/OBJECT_COVERAGE.md)
