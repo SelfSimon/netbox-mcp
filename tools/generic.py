@@ -22,7 +22,7 @@ from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from client.config import get_settings
+from client.config import get_settings, get_ui_url
 from client.registry import get_model_spec, iter_model_specs
 from client.rest import (
     DEFAULT_LIST_LIMIT,
@@ -78,9 +78,7 @@ def _validate_writable(resource: str) -> None:
     write would reach main directly, so they are created by hand."""
     spec = get_model_spec(resource)
     if not spec.branchable:
-        raise ValueError(
-            not_branchable_message(resource, spec, get_settings().netbox_ui_url)
-        )
+        raise ValueError(not_branchable_message(resource, spec, get_ui_url()))
 
 
 def search_resources(

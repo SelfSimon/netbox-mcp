@@ -17,6 +17,15 @@ class ClientSettings:
     max_retries: int = 2
 
 
+def get_ui_url() -> str:
+    """`NETBOX_UI_URL` without its trailing slash, or "" when unset.
+
+    Needs no other variable, so a message can link the NetBox UI even where
+    get_settings() would fail.
+    """
+    return os.environ.get("NETBOX_UI_URL", "").rstrip("/")
+
+
 def get_settings() -> ClientSettings:
     """Read configuration from environment variables.
 
@@ -41,7 +50,7 @@ def get_settings() -> ClientSettings:
 
     return ClientSettings(
         netbox_url=netbox_url.rstrip("/"),
-        netbox_ui_url=os.environ.get("NETBOX_UI_URL", "").rstrip("/"),
+        netbox_ui_url=get_ui_url(),
         timeout=timeout,
         max_retries=max_retries,
     )

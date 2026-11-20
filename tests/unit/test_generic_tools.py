@@ -418,6 +418,22 @@ def test_write_resource_refuses_a_non_branchable_resource(monkeypatch, action):
     assert "/users/owners/" in message
 
 
+def test_write_resource_refusal_needs_no_netbox_url_and_links_the_ui_url(
+    monkeypatch,
+):
+    # The refusal is built before any client exists: it must not depend on
+    # NETBOX_URL, and links only NETBOX_UI_URL (NETBOX-142).
+    monkeypatch.delenv("NETBOX_URL", raising=False)
+    monkeypatch.setenv("NETBOX_UI_URL", "https://netbox.example.com/")
+
+    with pytest.raises(ValueError) as excinfo:
+        generic.write_resource("owner", "create", branch="br1", data={})
+
+    assert str(excinfo.value).endswith(
+        "NetBox UI: https://netbox.example.com/users/owners/"
+    )
+
+
 def test_get_resource_schema_says_a_non_branchable_resource_is_read_only(
     monkeypatch,
 ):
