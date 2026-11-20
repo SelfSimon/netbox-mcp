@@ -14,6 +14,7 @@ def test_get_settings_reads_environment(monkeypatch):
     assert settings.netbox_url == "http://netbox.local"  # trailing slash stripped
     assert settings.timeout == 10.0
     assert settings.max_retries == 2
+    assert settings.netbox_ui_url == ""
 
 
 def test_get_settings_reads_optional_overrides(monkeypatch):
@@ -25,6 +26,16 @@ def test_get_settings_reads_optional_overrides(monkeypatch):
 
     assert settings.timeout == 5.0
     assert settings.max_retries == 0
+
+
+def test_get_settings_reads_the_ui_url(monkeypatch):
+    monkeypatch.setenv("NETBOX_URL", "http://netbox:8080")
+    monkeypatch.setenv("NETBOX_UI_URL", "https://netbox.example.com/")
+
+    settings = get_settings()
+
+    assert settings.netbox_url == "http://netbox:8080"
+    assert settings.netbox_ui_url == "https://netbox.example.com"
 
 
 def test_get_settings_raises_on_missing_url(monkeypatch):

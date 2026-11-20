@@ -10,7 +10,8 @@ from client.exceptions import (
     NetBoxPermissionError,
     NetBoxValidationError,
 )
-from client.rest import BRANCH_HEADER, NetBoxRestClient
+from client.registry import get_model_spec
+from client.rest import BRANCH_HEADER, NetBoxRestClient, not_branchable_message
 
 
 def make_client(handler, branch: str | None = None) -> NetBoxRestClient:
@@ -800,3 +801,14 @@ def test_reads_of_a_non_branchable_resource_still_work():
         return httpx.Response(200, json={"id": 1, "name": "Nord Quantique"})
 
     assert make_client(handler).get("owner", 1)["name"] == "Nord Quantique"
+
+
+def test_not_branchable_message_links_the_ui_url_never_netbox_url():
+    # NETBOX_URL may be internal (http://netbox:8080 in Docker): never a link.
+    spec = get_model_spec("owner")
+
+    with_ui = not_branchable_message("owner", spec, "https://netbox.example.com")
+    without_ui = not_branchable_message("owner", spec)
+
+    assert with_ui.endswith("NetBox UI: https://netbox.example.com/users/owners/")
+    assert without_ui.endswith("NetBox UI, page /users/owners/")

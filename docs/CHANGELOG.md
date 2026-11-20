@@ -44,6 +44,10 @@ All notable changes to this project will be documented in this file.
   say to create or change them in the NetBox UI, and `search_resources`
   returns `writable: false`. Reads are unchanged. An integration test
   checks the list against the live `branching` object-type feature.
+  The refusal links to the NetBox page only when the optional
+  `NETBOX_UI_URL` (NetBox's browser address) is set, otherwise it gives
+  the page path: `NETBOX_URL` is often internal (`http://netbox:8080` in
+  Docker) and is never used for links.
 - `get_resource_schema` exposes the fields of inline nested objects
   instead of an empty `reference_by` (NETBOX-137). Front/rear port
   mappings (`rear_ports` / `front_ports`, NetBox 4.5+) and cable

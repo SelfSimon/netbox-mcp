@@ -111,7 +111,9 @@ on it. 19 of them (users, groups, permissions, tokens, owners, custom
 fields, webhooks, event rules, core objects, ...) are read-only through
 the MCP: netbox_branching does not version them, so a write would land
 directly on `main` — create or change them in the NetBox UI
-(NETBOX-142). A resource only graduates to a dedicated tool once it's high-usage
+(NETBOX-142). Set `NETBOX_UI_URL` to NetBox's browser address so the
+refusal message links to the right page; `NETBOX_URL` is often internal
+(`http://netbox:8080` in Docker) and is never used for links. A resource only graduates to a dedicated tool once it's high-usage
 enough to warrant a precise Pydantic schema and per-action MCP
 annotations — see
 [docs/OBJECT_COVERAGE.md](https://github.com/SelfSimon/netbox-mcp/blob/main/docs/OBJECT_COVERAGE.md)

@@ -12,6 +12,7 @@ from .exceptions import NetBoxConfigurationError
 class ClientSettings:
     netbox_url: str
     netbox_api_token: str = ""
+    netbox_ui_url: str = ""
     timeout: float = 10.0
     max_retries: int = 2
 
@@ -24,6 +25,11 @@ def get_settings() -> ClientSettings:
     own NetBox token (`netbox_mcp.auth.get_current_token`) — there is no
     service-account fallback.
 
+    `NETBOX_UI_URL` is optional: the NetBox address as users open it in a
+    browser, used only to build links in messages. `NETBOX_URL` is the
+    address the server reaches NetBox at, often internal (e.g.
+    `http://netbox:8080` in Docker), so it is never used for links.
+
     Raises NetBoxConfigurationError if NETBOX_URL is missing.
     """
     netbox_url = os.environ.get("NETBOX_URL")
@@ -35,6 +41,7 @@ def get_settings() -> ClientSettings:
 
     return ClientSettings(
         netbox_url=netbox_url.rstrip("/"),
+        netbox_ui_url=os.environ.get("NETBOX_UI_URL", "").rstrip("/"),
         timeout=timeout,
         max_retries=max_retries,
     )

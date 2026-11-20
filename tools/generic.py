@@ -79,7 +79,7 @@ def _validate_writable(resource: str) -> None:
     spec = get_model_spec(resource)
     if not spec.branchable:
         raise ValueError(
-            not_branchable_message(resource, spec, get_settings().netbox_url)
+            not_branchable_message(resource, spec, get_settings().netbox_ui_url)
         )
 
 
