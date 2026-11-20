@@ -19,6 +19,15 @@ All notable changes to this project will be documented in this file.
   NetBox 4.5+ ownership) are in the registry (NETBOX-138): an owner can be
   looked up by name before it is set on a device. The registry now holds
   115 resources.
+- `create_device`/`update_device` accept `position` (half units allowed),
+  `face`, `airflow`, `platform`, `cluster`, `owner`, `primary_ip4`,
+  `primary_ip6`, `description` and `tags`; `create_interface`/
+  `update_interface` accept `label`, `speed`, `duplex`, `mgmt_only`,
+  `mark_connected`, `poe_mode`, `poe_type`, `mode`, `untagged_vlan`,
+  `tagged_vlans`, `lag`, `parent`, `vrf` and `tags` (NETBOX-139). Choice
+  fields are validated against NetBox 4.6's values; tags are objects,
+  `{"name": ...}` or `{"slug": ...}`. Custom fields come later
+  (NETBOX-141).
 
 ### Fixed
 
