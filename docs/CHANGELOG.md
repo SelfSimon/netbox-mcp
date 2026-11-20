@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.2.0] - 2026-11-20
+
+To deploy: set the optional `NETBOX_UI_URL` (NetBox's browser address)
+next to `NETBOX_URL`, so refusals link to the right NetBox page.
+
 ### Added
 
 - `list_devices` accepts the `rack_id` and `location_id` filters
@@ -65,6 +70,14 @@ All notable changes to this project will be documented in this file.
 - Dependabot (`.github/dependabot.yml`) opens weekly PRs against
   `development` for pip and GitHub Actions updates; minor and patch bumps
   are grouped, each major bump gets its own PR (NETBOX-119).
+- Minimum versions raised by Dependabot: `fastmcp>=4.2.0,<5`,
+  `uvicorn>=0.54.0`, `anyio>=4.16.0`; dev: `pytest>=9.2.0`,
+  `pytest-mock>=3.17.0`, `pre-commit>=4.7.0`, `ruff==0.17.5`. GitHub
+  Actions moved to `actions/checkout@v7`, `actions/setup-python@v7` and
+  the v4/v7 Docker actions.
+- CI also runs on pull requests to `development`, so Dependabot's PRs are
+  tested. A unit test fails when the pre-commit ruff hook's `rev` differs
+  from the `ruff==` pin, since Dependabot only bumps the latter.
 - `ToolAnnotations` use the MCP SDK v2 field names (`read_only_hint`,
   `destructive_hint`, `idempotent_hint`); the wire format is unchanged.
 
