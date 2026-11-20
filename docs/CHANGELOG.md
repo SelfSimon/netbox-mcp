@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- `list_devices` accepts the `rack_id` and `location_id` filters
+  (NETBOX-140). `location_id` also matches devices in child locations,
+  like NetBox's own filter.
+
 ### Changed
 
 - `fastmcp` and `mcp` are bounded to one major version, `fastmcp>=4.1,<5`

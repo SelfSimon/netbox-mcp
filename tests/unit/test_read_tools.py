@@ -186,6 +186,19 @@ def test_list_devices_sends_filters_as_query_params(monkeypatch):
     read.list_devices(DeviceFilter(status=DeviceStatus.ACTIVE, site_id=3))
 
 
+def test_list_devices_filters_by_rack_and_location(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["rack_id"] == "2"
+        assert request.url.params["location_id"] == "1"
+        return httpx.Response(
+            200, json={"count": 0, "next": None, "previous": None, "results": []}
+        )
+
+    monkeypatch.setattr(read, "_client", lambda: make_client(handler))
+
+    read.list_devices(DeviceFilter(rack_id=2, location_id=1))
+
+
 def test_get_device_requests_object_url(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/dcim/devices/42/"
