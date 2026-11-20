@@ -39,3 +39,11 @@ COMPONENT_TEMPLATES = {
 @pytest.mark.parametrize(("resource", "rest_path"), COMPONENT_TEMPLATES.items())
 def test_every_component_template_is_registered(resource, rest_path):
     assert get_model_spec(resource).rest_path == rest_path
+
+
+@pytest.mark.parametrize(
+    ("resource", "rest_path"),
+    [("owner", "users/owners/"), ("owner_group", "users/owner-groups/")],
+)
+def test_ownership_resources_are_registered(resource, rest_path):
+    assert get_model_spec(resource).rest_path == rest_path

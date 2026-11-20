@@ -14,7 +14,11 @@ All notable changes to this project will be documented in this file.
   module bay, device bay, inventory item) are in the registry, so the
   generic tools reach them (NETBOX-137). A device type gets its components
   once, and NetBox creates them on every new device of that type, also
-  inside a branch. The registry now holds 113 resources.
+  inside a branch.
+- `owner` and `owner_group` (`users/owners/`, `users/owner-groups/`,
+  NetBox 4.5+ ownership) are in the registry (NETBOX-138): an owner can be
+  looked up by name before it is set on a device. The registry now holds
+  115 resources.
 
 ### Fixed
 

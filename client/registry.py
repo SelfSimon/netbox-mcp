@@ -191,6 +191,9 @@ _REGISTRY: dict[str, ModelSpec] = {
     "group": ModelSpec("users/groups/", "Group"),
     "permission": ModelSpec("users/permissions/", "Permission"),
     "token": ModelSpec("users/tokens/", "Token"),
+    # Ownership (NetBox 4.5+): the `owner` field on devices and other objects.
+    "owner": ModelSpec("users/owners/", "Owner"),
+    "owner_group": ModelSpec("users/owner-groups/", "Owner group"),
     "data_source": ModelSpec("core/data-sources/", "Data source"),
     "data_file": ModelSpec("core/data-files/", "Data file"),
     "job": ModelSpec("core/jobs/", "Job"),

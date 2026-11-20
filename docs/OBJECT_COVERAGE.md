@@ -187,6 +187,8 @@ enough that a dedicated tool becomes the exception rather than the norm.
 | Group | `users/groups/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Permission | `users/permissions/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Token | `users/tokens/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Owner | `users/owners/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Owner group | `users/owner-groups/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Data source | `core/data-sources/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Data file | `core/data-files/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Job | `core/jobs/` | ✅ | ⬜ | ⬜ | ⬜ |
