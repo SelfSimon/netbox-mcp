@@ -1,9 +1,11 @@
 import asyncio
 
 import httpx
+import pytest
 from fastmcp import FastMCP
 
 from client.config import ClientSettings
+from client.exceptions import NetBoxNotFoundError
 from client.rest import BRANCH_HEADER, NetBoxRestClient
 from schemas.writes import (
     DeviceCreate,
@@ -231,6 +233,7 @@ def test_register_adds_all_write_tools():
         "assign_ip_address",
         "create_branch",
         "list_branches",
+        "get_branch_diff",
     }
 
 
@@ -259,10 +262,174 @@ def test_update_tools_are_destructive_and_idempotent():
         assert tools_by_name[name].annotations.idempotent_hint is True
 
 
-def test_list_branches_is_read_only():
+def test_branch_read_tools_are_read_only():
     mcp = FastMCP(name="test")
     write.register(mcp)
     tools_by_name = {t.name: t for t in asyncio.run(mcp.list_tools())}
 
-    assert tools_by_name["list_branches"].annotations.read_only_hint is True
-    assert tools_by_name["list_branches"].annotations.idempotent_hint is True
+    for name in ("list_branches", "get_branch_diff"):
+        assert tools_by_name[name].annotations.read_only_hint is True
+        assert tools_by_name[name].annotations.idempotent_hint is True
+
+
+def change(id, action, object_type="dcim.site", object_id=1, **data):
+    return {
+        "id": id,
+        "branch": {"id": 3, "name": "add-sites", "status": {"value": "ready"}},
+        "object_type": object_type,
+        "object_id": object_id,
+        "object_repr": f"obj{object_id}",
+        "action": {"value": action, "label": action.capitalize()},
+        "conflicts": data.get("conflicts"),
+        "original_data": data.get("original"),
+        "modified_data": data.get("modified"),
+        "current_data": data.get("current"),
+    }
+
+
+def diff_handler(changes, seen=None, counts=None):
+    counts = counts or {"create": 1, "update": 1, "delete": 1}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/plugins/branching/changes/"
+        assert BRANCH_HEADER not in request.headers
+        if seen is not None:
+            seen.append(request.url.params)
+        if request.url.params["limit"] == "1" and "action" in request.url.params:
+            count = counts[request.url.params["action"]]
+            return httpx.Response(
+                200, json={"count": count, "next": None, "results": []}
+            )
+        return httpx.Response(
+            200, json={"count": len(changes), "next": None, "results": changes}
+        )
+
+    return handler
+
+
+def test_get_branch_diff_summarizes_each_change(monkeypatch):
+    changes = [
+        change(
+            1,
+            "create",
+            object_id=10,
+            modified={
+                "name": "MTL1",
+                "slug": "mtl1",
+                "description": "",
+                "tenant": None,
+                "tags": [],
+                "created": "2026-11-21T10:00:00Z",
+            },
+        ),
+        change(
+            2,
+            "update",
+            object_id=11,
+            original={"name": "QC1", "status": "planned", "last_updated": "a"},
+            modified={"name": "QC1", "status": "active", "last_updated": "b"},
+            current={"name": "QC1", "status": "planned", "last_updated": "a"},
+        ),
+        change(3, "delete", object_id=12, original={"name": "OLD"}),
+    ]
+    monkeypatch.setattr(
+        write, "_client", lambda branch=None: make_client(diff_handler(changes))
+    )
+
+    result = write.get_branch_diff("br_abc123")
+
+    assert result["branch"] == "add-sites"
+    assert result["summary"] == {"create": 1, "update": 1, "delete": 1}
+    assert result["count"] == 3
+    assert result["truncated"] is False
+    assert result["results"] == [
+        {
+            "id": 1,
+            "action": "create",
+            "object_type": "dcim.site",
+            "object_id": 10,
+            "object": "obj10",
+            "data": {"name": "MTL1", "slug": "mtl1"},
+        },
+        {
+            "id": 2,
+            "action": "update",
+            "object_type": "dcim.site",
+            "object_id": 11,
+            "object": "obj11",
+            "changes": {"status": {"before": "planned", "after": "active"}},
+        },
+        {
+            "id": 3,
+            "action": "delete",
+            "object_type": "dcim.site",
+            "object_id": 12,
+            "object": "obj12",
+        },
+    ]
+
+
+def test_get_branch_diff_reports_conflicts_with_main(monkeypatch):
+    changes = [
+        change(
+            1,
+            "update",
+            conflicts=["status"],
+            original={"status": "planned"},
+            modified={"status": "active"},
+            current={"status": "retired"},
+        )
+    ]
+    monkeypatch.setattr(
+        write, "_client", lambda branch=None: make_client(diff_handler(changes))
+    )
+
+    result = write.get_branch_diff("br_abc123")
+
+    assert result["results"][0]["conflicts"] == {
+        "status": {"original": "planned", "branch": "active", "main": "retired"}
+    }
+
+
+def test_get_branch_diff_filters_by_schema_id_type_and_action(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        write, "_client", lambda branch=None: make_client(diff_handler([], seen))
+    )
+
+    result = write.get_branch_diff(
+        "br_abc123", object_type="dcim.device", action="update", limit=5, offset=10
+    )
+
+    page = seen[0]
+    assert page["branch"] == "br_abc123"
+    assert page["object_type"] == "dcim.device"
+    assert page["action"] == "update"
+    assert page["limit"] == "5"
+    assert page["offset"] == "10"
+    assert page["ordering"] == "object_type,object_id"
+    # The summary counts the whole branch: one request per action, without
+    # the object_type filter.
+    counts = seen[1:]
+    assert [c["action"] for c in counts] == ["create", "update", "delete"]
+    assert all(c["branch"] == "br_abc123" and "object_type" not in c for c in counts)
+    # No change on this page: the branch name falls back to the schema_id.
+    assert result["branch"] == "br_abc123"
+
+
+def test_get_branch_diff_on_an_unknown_branch_says_to_pass_a_schema_id(monkeypatch):
+    # What NetBox answers for an unknown `branch` filter value.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={
+                "branch": [
+                    "Select a valid choice. add-sites is not one of the choices."
+                ]
+            },
+        )
+
+    monkeypatch.setattr(write, "_client", lambda branch=None: make_client(handler))
+
+    with pytest.raises(NetBoxNotFoundError, match="schema_id 'add-sites'"):
+        write.get_branch_diff("add-sites")

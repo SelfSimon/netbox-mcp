@@ -1,6 +1,6 @@
 """Write MCP tools: create/update for device and interface, IP address
-assignment, and netbox_branching branch management (create + list only —
-no merge/sync/revert/archive, see client/branches.py).
+assignment, and netbox_branching branch management (create, list, and a
+read-only diff — no merge/sync/revert/archive, see client/branches.py).
 
 Every create/update tool takes a `branch`: the schema_id of an active
 netbox_branching branch (obtained from create_branch()), scoping the write
@@ -15,7 +15,7 @@ account, same as tools/read.py.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
@@ -146,6 +146,57 @@ def list_branches(
         return list_response(branch_client.list_branches(client, params))
 
 
+def get_branch_diff(
+    branch: str,
+    object_type: str | None = None,
+    action: Literal["create", "update", "delete"] | None = None,
+    limit: Annotated[int, Field(ge=1, le=MAX_LIST_LIMIT)] = DEFAULT_LIST_LIMIT,
+    offset: Annotated[int, Field(ge=0)] = 0,
+) -> dict[str, Any]:
+    """Show what a branch changes compared with main, for review. Read-only.
+
+    Reads never see a branch (they target `main`), so this is the way to
+    check what your writes actually did: call it after the writes of a
+    task, before telling the user the branch is ready for review — then
+    give them the branch name and a short summary of this diff. It never
+    changes the branch; merging stays a human action in the NetBox UI.
+
+    `branch` is the branch's schema_id (as for the write tools). One entry
+    per object changed in the branch, grouped by object type:
+    - create: `data`, the new object's non-empty fields;
+    - update: `changes`, `{field: {"before", "after"}}`;
+    - delete: the object's identity only;
+    - `conflicts` (any action): fields main has changed too since the
+      branch did, as `{field: {"original", "branch", "main"}}` — point
+      them out to the user, the merge will need them acknowledged.
+
+    Filter with `object_type` ("dcim.device") or `action`. `summary` counts
+    the branch's changes per action, whatever the filters. Returns
+    `{branch, summary, count, returned, offset, truncated, next_offset,
+    results}`; when `truncated` is true, continue from `next_offset`.
+    """
+    params: dict[str, Any] = {"limit": limit, "ordering": "object_type,object_id"}
+    if offset:
+        params["offset"] = offset
+    if object_type:
+        params["object_type"] = object_type
+    if action:
+        params["action"] = action
+    with _client() as client:
+        page = branch_client.list_changes(client, branch, params)
+        summary = {
+            name: branch_client.count_changes(client, branch, {"action": name})
+            for name in branch_client.CHANGE_ACTIONS
+        }
+    first = page["results"][0] if page["results"] else {}
+    page["results"] = [branch_client.summarize_change(c) for c in page["results"]]
+    return {
+        "branch": (first.get("branch") or {}).get("name", branch),
+        "summary": summary,
+        **list_response(page),
+    }
+
+
 _CREATE_ANNOTATIONS = ToolAnnotations(destructive_hint=False, idempotent_hint=False)
 _UPDATE_ANNOTATIONS = ToolAnnotations(destructive_hint=True, idempotent_hint=True)
 _BRANCH_LIST_ANNOTATIONS = ToolAnnotations(read_only_hint=True, idempotent_hint=True)
@@ -158,6 +209,7 @@ _WRITE_TOOLS = (
     (assign_ip_address, _CREATE_ANNOTATIONS),
     (create_branch, _CREATE_ANNOTATIONS),
     (list_branches, _BRANCH_LIST_ANNOTATIONS),
+    (get_branch_diff, _BRANCH_LIST_ANNOTATIONS),
 )
 
 
