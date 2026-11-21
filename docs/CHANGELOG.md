@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.3.0] - 2026-11-21
+
+Nothing to change to deploy: same configuration as 0.2.0.
+
+### Added
+
+- `get_branch_diff` tool, read-only (NETBOX-104): what a branch changes
+  compared with `main`, from netbox_branching's ChangeDiffs. One entry per
+  changed object, grouped by object type: the new object's non-empty
+  fields for a create, `{before, after}` for each altered field of an
+  update, the object's identity for a delete, and the fields in conflict
+  with `main`. Filters by `object_type` and `action`; a `summary` counts
+  the branch's changes per action. Reads never see a branch, so this is
+  how Claude checks its writes before handing the branch to a human.
+
 ## [0.2.0] - 2026-11-20
 
 To deploy: set the optional `NETBOX_UI_URL` (NetBox's browser address)

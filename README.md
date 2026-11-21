@@ -98,7 +98,11 @@ site, device, interface, ip_address, and vlan (`list_*`/`get_*` in
 device and interface create/update, IP address assignment, and
 `netbox_branching` branch create/list (`tools/write.py`, same
 registration point) — every create/update tool requires an active branch,
-and merge stays a human-only action in the NetBox UI.
+and merge stays a human-only action in the NetBox UI. Since reads always
+target `main`, `get_branch_diff` (read-only, NETBOX-104) shows what a
+branch changes before that review: one entry per changed object, with the
+new object's fields (create), `{before, after}` per altered field
+(update), or its identity (delete), plus any conflict with `main`.
 
 Every other NetBox object type registered in `client/registry.py`
 (110 of its 115 resources, across DCIM, IPAM, virtualization, circuits, tenancy,
@@ -123,7 +127,8 @@ rationale.
 ### Lists, paging and response size
 
 Every tool that returns a list (`list_*`, `get_resource` without an
-`object_id`, `search_resources`, `list_branches`) returns an envelope, never
+`object_id`, `search_resources`, `list_branches`, `get_branch_diff`) returns
+an envelope, never
 a bare list:
 
 ```json

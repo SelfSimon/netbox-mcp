@@ -167,3 +167,53 @@ def test_assign_ip_address_to_an_interface_inside_a_branch(branch, device_prereq
     )
     assert created["address"] == address
     assert created["assigned_object_id"] == interface["id"]
+
+
+def test_get_branch_diff_shows_a_device_created_then_updated_in_the_branch(
+    branch, device_prereqs
+):
+    slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
+    created = write.create_device(_device_payload(device_prereqs, slug), branch=branch)
+    write.update_device(
+        created["id"],
+        DeviceUpdate(comments="checked by get_branch_diff"),
+        branch=branch,
+    )
+
+    diff = write.get_branch_diff(branch, object_type="dcim.device", limit=1000)
+
+    # One ChangeDiff per object: the create and the update are folded into
+    # a single create holding the object's latest state.
+    entries = [e for e in diff["results"] if e["object_id"] == created["id"]]
+    assert len(entries) == 1
+    assert entries[0]["action"] == "create"
+    assert entries[0]["data"]["name"] == slug
+    assert entries[0]["data"]["comments"] == "checked by get_branch_diff"
+    assert diff["summary"]["create"] >= 1
+
+
+def test_get_branch_diff_shows_the_fields_an_update_changes(branch):
+    # An object that exists on main, updated in the branch only.
+    with NetBoxRestClient() as main_client:
+        sites = main_client.list("site", {"limit": 1})
+    if not sites:
+        pytest.skip("needs at least one site on main")
+    site = sites[0]
+    note = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
+    with NetBoxRestClient(branch=branch) as client:
+        client.patch("site", site["id"], {"description": note})
+
+    diff = write.get_branch_diff(
+        branch, object_type="dcim.site", action="update", limit=1000
+    )
+
+    entry = next(e for e in diff["results"] if e["object_id"] == site["id"])
+    assert entry["changes"]["description"] == {
+        "before": site["description"],
+        "after": note,
+    }
+
+
+def test_get_branch_diff_on_an_unknown_branch_is_not_found():
+    with pytest.raises(NetBoxNotFoundError, match="schema_id"):
+        write.get_branch_diff("zzzzzzzz")

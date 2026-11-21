@@ -39,8 +39,10 @@ minimal representation (no custom fields, tags or related objects).
 Writes never touch `main`: every write tool needs a `branch`, the
 `schema_id` of a netbox_branching branch. Create ONE branch per task with
 create_branch() and reuse it for every related write; check list_branches()
-before creating another. Merging a branch is a human action in the NetBox
-UI — this server cannot do it, so tell the user which branch to review.
+before creating another. Reads cannot see a branch: to check what your
+writes did, call get_branch_diff() on it. Merging a branch is a human
+action in the NetBox UI — this server cannot do it, so tell the user which
+branch to review, with a short summary of its diff.
 Resources search_resources() marks `writable: false` (users, tokens,
 permissions, owners, custom fields, webhooks, ...) are not versioned by
 netbox_branching and cannot be written here: ask the user to create or
