@@ -41,6 +41,10 @@ Writes never touch `main`: every write tool needs a `branch`, the
 create_branch() and reuse it for every related write; check list_branches()
 before creating another. Merging a branch is a human action in the NetBox
 UI — this server cannot do it, so tell the user which branch to review.
+Resources search_resources() marks `writable: false` (users, tokens,
+permissions, owners, custom fields, webhooks, ...) are not versioned by
+netbox_branching and cannot be written here: ask the user to create or
+change them manually in the NetBox UI.
 
 site, device, interface, ip_address and vlan have dedicated tools; prefer
 them. For any other object type, find its name with search_resources(),

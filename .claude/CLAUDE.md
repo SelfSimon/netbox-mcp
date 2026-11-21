@@ -79,9 +79,15 @@
 - `netbox_branching` branches are write-only from MCP: no `merge()`/`sync()`/
   `revert()`/`archive()` by design — merging into `main` is a human action in
   the NetBox UI. Do not add these.
-- Only 5 of the 103 registered resources (site, device, interface, ip_address,
+- Only 5 of the 115 registered resources (site, device, interface, ip_address,
   vlan) have dedicated schemas + tools; everything else in
   `client/registry.py` is reachable generically via `tools/generic.py`
   (`search_resources`/`get_resource`/`write_resource` — no per-object
   Pydantic schema, NetBox's own REST API validates). Check
   `docs/OBJECT_COVERAGE.md` before assuming a resource has a dedicated tool.
+- `ModelSpec(branchable=False)` marks the 19 resources netbox_branching
+  does not version (users/*, core/*, custom fields, webhooks, ...): it
+  ignores `X-NetBox-Branch` for them, so the client refuses every write
+  (NETBOX-142). A newly registered resource must be checked —
+  `pytest -m integration -k branchable` compares the registry with the
+  live `branching` object-type feature.

@@ -5,11 +5,13 @@ from client.config import ClientSettings
 from client.exceptions import (
     NetBoxConnectionError,
     NetBoxNoBranchError,
+    NetBoxNotBranchableError,
     NetBoxNotFoundError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
-from client.rest import BRANCH_HEADER, NetBoxRestClient
+from client.registry import get_model_spec
+from client.rest import BRANCH_HEADER, NetBoxRestClient, not_branchable_message
 
 
 def make_client(handler, branch: str | None = None) -> NetBoxRestClient:
@@ -698,3 +700,115 @@ def test_schema_maps_404_to_not_found_error():
 
     with pytest.raises(NetBoxNotFoundError):
         client.schema("power_panel")
+
+
+FRONT_PORT_TEMPLATE_OPTIONS = {
+    "actions": {
+        "POST": {
+            "name": {
+                "type": "string",
+                "required": True,
+                "read_only": False,
+                "label": "Name",
+                "max_length": 64,
+            },
+            "rear_ports": {
+                "type": "field",
+                "required": False,
+                "read_only": False,
+                "label": "Rear ports",
+                "child": {
+                    "type": "nested object",
+                    "required": False,
+                    "read_only": False,
+                    "children": {
+                        "position": {
+                            "type": "integer",
+                            "required": True,
+                            "read_only": False,
+                            "label": "Position",
+                        },
+                        "rear_port": {
+                            "type": "field",
+                            "required": True,
+                            "read_only": False,
+                            "label": "Rear port",
+                        },
+                        "rear_port_position": {
+                            "type": "integer",
+                            "required": False,
+                            "read_only": False,
+                            "label": "Rear port position",
+                        },
+                    },
+                },
+            },
+        }
+    }
+}
+
+
+def test_schema_exposes_fields_of_inline_nested_objects():
+    # NetBox 4.5+ maps front ports to rear ports with a list of inline
+    # objects, not references: they have no id/slug/name to reference by,
+    # so their own fields must be exposed instead.
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/dcim/front-port-templates/"
+        return httpx.Response(200, json=FRONT_PORT_TEMPLATE_OPTIONS)
+
+    client = make_client(handler)
+
+    assert client.schema("front_port_template")["rear_ports"] == {
+        "type": "list[object]",
+        "required": False,
+        "label": "Rear ports",
+        "fields": {
+            "position": {"type": "integer", "required": True, "label": "Position"},
+            "rear_port": {"type": "field", "required": True, "label": "Rear port"},
+            "rear_port_position": {
+                "type": "integer",
+                "required": False,
+                "label": "Rear port position",
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("method", "args"),
+    [
+        ("create", ("owner", {"name": "x"})),
+        ("update", ("owner", 1, {"name": "x"})),
+        ("patch", ("owner", 1, {"name": "x"})),
+        ("delete", ("owner", 1)),
+    ],
+)
+def test_writes_to_a_non_branchable_resource_are_refused_before_any_request(
+    method, args
+):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request may reach NetBox")
+
+    client = make_client(handler, branch="br1")
+
+    with pytest.raises(NetBoxNotBranchableError, match="NetBox UI"):
+        getattr(client, method)(*args)
+
+
+def test_reads_of_a_non_branchable_resource_still_work():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/users/owners/1/"
+        return httpx.Response(200, json={"id": 1, "name": "Nord Quantique"})
+
+    assert make_client(handler).get("owner", 1)["name"] == "Nord Quantique"
+
+
+def test_not_branchable_message_links_the_ui_url_never_netbox_url():
+    # NETBOX_URL may be internal (http://netbox:8080 in Docker): never a link.
+    spec = get_model_spec("owner")
+
+    with_ui = not_branchable_message("owner", spec, "https://netbox.example.com")
+    without_ui = not_branchable_message("owner", spec)
+
+    assert with_ui.endswith("NetBox UI: https://netbox.example.com/users/owners/")
+    assert without_ui.endswith("NetBox UI, page /users/owners/")

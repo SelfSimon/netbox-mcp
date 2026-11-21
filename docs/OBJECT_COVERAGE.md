@@ -20,6 +20,14 @@ decisions.
   (`tools/generic.py`: `search_resources`, `get_resource`,
   `write_resource`) — no read filter, write schema, or dedicated tool
   required.
+- 🔒 **read-only through MCP** (NETBOX-142): netbox_branching does not
+  version this object (no change logging, or exempted by the plugin) and
+  ignores `X-NetBox-Branch`, so a write would land directly on `main`.
+  `write_resource` and `get_resource_schema` refuse it and tell the user
+  to create or change it manually in the NetBox UI; reads still work.
+  These objects are rare and never created in bulk. The list is the
+  `branchable=False` entries of `client/registry.py`, checked against a
+  live NetBox by `tests/integration/test_rest_integration.py`.
 - **Read filter**: Pydantic filter schema in `schemas/filters.py`
 - **Write schema**: Pydantic create/update payload(s) in `schemas/writes.py`
 - **Dedicated tool**: MCP tool exposed in `tools/read.py`/`tools/write.py`
@@ -72,7 +80,16 @@ enough that a dedicated tool becomes the exception rather than the norm.
 | Front port | `dcim/front-ports/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Rear port | `dcim/rear-ports/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Cable | `dcim/cables/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Device/module/template bays & port templates | `dcim/*-templates/` | ⬜ | ⬜ | ⬜ | ⬜ |
+| Console port template | `dcim/console-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Console server port template | `dcim/console-server-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Power port template | `dcim/power-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Power outlet template | `dcim/power-outlet-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Interface template | `dcim/interface-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Front port template | `dcim/front-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Rear port template | `dcim/rear-port-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Module bay template | `dcim/module-bay-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Device bay template | `dcim/device-bay-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Inventory item template | `dcim/inventory-item-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
 
 ## IPAM
 
@@ -155,32 +172,34 @@ enough that a dedicated tool becomes the exception rather than the norm.
 | Object | REST endpoint | Registry | Read filter | Write schema | Dedicated tool |
 |---|---|---|---|---|---|
 | Tag | `extras/tags/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Custom field | `extras/custom-fields/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Custom field choice set | `extras/custom-field-choice-sets/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Custom link | `extras/custom-links/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Custom field | `extras/custom-fields/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Custom field choice set | `extras/custom-field-choice-sets/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Custom link | `extras/custom-links/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
 | Config context | `extras/config-contexts/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Config template | `extras/config-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Export template | `extras/export-templates/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Saved filter | `extras/saved-filters/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Webhook | `extras/webhooks/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Event rule | `extras/event-rules/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Notification group | `extras/notification-groups/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Export template | `extras/export-templates/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Saved filter | `extras/saved-filters/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Webhook | `extras/webhooks/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Event rule | `extras/event-rules/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Notification group | `extras/notification-groups/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
 | Journal entry | `extras/journal-entries/` | ✅ | ⬜ | ⬜ | ⬜ |
 | Image attachment | `extras/image-attachments/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Bookmark | `extras/bookmarks/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Script | `extras/scripts/` | ✅ | ⬜ | ⬜ | ⬜ |
+| Bookmark | `extras/bookmarks/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Script | `extras/scripts/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
 
 ## Users / core
 
 | Object | REST endpoint | Registry | Read filter | Write schema | Dedicated tool |
 |---|---|---|---|---|---|
-| User | `users/users/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Group | `users/groups/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Permission | `users/permissions/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Token | `users/tokens/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Data source | `core/data-sources/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Data file | `core/data-files/` | ✅ | ⬜ | ⬜ | ⬜ |
-| Job | `core/jobs/` | ✅ | ⬜ | ⬜ | ⬜ |
+| User | `users/users/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Group | `users/groups/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Permission | `users/permissions/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Token | `users/tokens/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Owner | `users/owners/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Owner group | `users/owner-groups/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Data source | `core/data-sources/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Data file | `core/data-files/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
+| Job | `core/jobs/` | ✅ 🔒 | ⬜ | ⬜ | ⬜ |
 
 ## Plugins
 

@@ -29,7 +29,10 @@ def test_search_resources_with_no_query_returns_everything():
     resource_names = {r["resource"] for r in result["results"]}
     assert "rack" in resource_names
     assert "tenant" in resource_names
-    assert all({"resource", "label", "rest_path"} == set(r) for r in result["results"])
+    assert all(
+        {"resource", "label", "rest_path", "writable"} == set(r)
+        for r in result["results"]
+    )
     assert result["returned"] == result["count"]
     assert result["truncated"] is False
 
@@ -40,6 +43,24 @@ def test_search_resources_filters_by_name_or_label_case_insensitively():
     resource_names = {r["resource"] for r in result["results"]}
     assert resource_names == {"rack", "rack_role", "rack_reservation", "rack_type"}
     assert result["count"] == 4
+
+
+def test_search_resources_finds_every_component_template():
+    result = generic.search_resources("template")
+
+    resource_names = {r["resource"] for r in result["results"]}
+    assert {
+        "console_port_template",
+        "console_server_port_template",
+        "device_bay_template",
+        "front_port_template",
+        "interface_template",
+        "inventory_item_template",
+        "module_bay_template",
+        "power_outlet_template",
+        "power_port_template",
+        "rear_port_template",
+    } <= resource_names
 
 
 def test_search_resources_matches_label_not_just_resource_name():
@@ -368,3 +389,67 @@ def test_validate_resource_suggests_close_matches_for_unknown_resource():
 def test_validate_resource_falls_back_to_search_hint_when_no_matches():
     with pytest.raises(ValueError, match=r"call search_resources\(\)"):
         generic.get_resource("zzzznotreal")
+
+
+def test_search_resources_flags_resources_the_mcp_cannot_write():
+    results = {r["resource"]: r for r in generic.search_resources()["results"]}
+
+    assert results["owner"]["writable"] is False
+    assert results["webhook"]["writable"] is False
+    assert results["device"]["writable"] is True
+
+
+@pytest.mark.parametrize("action", ["create", "update", "patch", "delete"])
+def test_write_resource_refuses_a_non_branchable_resource(monkeypatch, action):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request may reach NetBox")
+
+    monkeypatch.setattr(
+        generic, "_client", lambda branch=None: make_client(handler, branch=branch)
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        generic.write_resource(
+            "owner", action, branch="br1", object_id=1, data={}, confirm=True
+        )
+
+    message = str(excinfo.value)
+    assert "manually in the NetBox UI" in message
+    assert "/users/owners/" in message
+
+
+def test_write_resource_refusal_needs_no_netbox_url_and_links_the_ui_url(
+    monkeypatch,
+):
+    # The refusal is built before any client exists: it must not depend on
+    # NETBOX_URL, and links only NETBOX_UI_URL (NETBOX-142).
+    monkeypatch.delenv("NETBOX_URL", raising=False)
+    monkeypatch.setenv("NETBOX_UI_URL", "https://netbox.example.com/")
+
+    with pytest.raises(ValueError) as excinfo:
+        generic.write_resource("owner", "create", branch="br1", data={})
+
+    assert str(excinfo.value).endswith(
+        "NetBox UI: https://netbox.example.com/users/owners/"
+    )
+
+
+def test_get_resource_schema_says_a_non_branchable_resource_is_read_only(
+    monkeypatch,
+):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request may reach NetBox")
+
+    monkeypatch.setattr(generic, "_client", lambda branch=None: make_client(handler))
+
+    with pytest.raises(ValueError, match="manually in the NetBox UI"):
+        generic.get_resource_schema("token")
+
+
+def test_get_resource_still_reads_a_non_branchable_resource(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"id": 1, "name": "Nord Quantique"})
+
+    monkeypatch.setattr(generic, "_client", lambda branch=None: make_client(handler))
+
+    assert generic.get_resource("owner", object_id=1)["name"] == "Nord Quantique"

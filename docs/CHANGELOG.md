@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.2.0] - 2026-11-20
+
+To deploy: set the optional `NETBOX_UI_URL` (NetBox's browser address)
+next to `NETBOX_URL`, so refusals link to the right NetBox page.
+
+### Added
+
+- `list_devices` accepts the `rack_id` and `location_id` filters
+  (NETBOX-140). `location_id` also matches devices in child locations,
+  like NetBox's own filter.
+- The 10 component templates (`dcim/*-templates/`: console port, console
+  server port, power port, power outlet, interface, front port, rear port,
+  module bay, device bay, inventory item) are in the registry, so the
+  generic tools reach them (NETBOX-137). A device type gets its components
+  once, and NetBox creates them on every new device of that type, also
+  inside a branch.
+- `owner` and `owner_group` (`users/owners/`, `users/owner-groups/`,
+  NetBox 4.5+ ownership) are in the registry (NETBOX-138): an owner can be
+  looked up by name before it is set on a device. The registry now holds
+  115 resources.
+- `create_device`/`update_device` accept `position` (half units allowed),
+  `face`, `airflow`, `platform`, `cluster`, `owner`, `primary_ip4`,
+  `primary_ip6`, `description` and `tags`; `create_interface`/
+  `update_interface` accept `label`, `speed`, `duplex`, `mgmt_only`,
+  `mark_connected`, `poe_mode`, `poe_type`, `mode`, `untagged_vlan`,
+  `tagged_vlans`, `lag`, `parent`, `vrf` and `tags` (NETBOX-139). Choice
+  fields are validated against NetBox 4.6's values; tags are objects,
+  `{"name": ...}` or `{"slug": ...}`. Custom fields come later
+  (NETBOX-141).
+
+### Fixed
+
+- Writes no longer reach `main` through resources netbox_branching does
+  not version (NETBOX-142). The plugin ignores `X-NetBox-Branch` for
+  models without change logging or exempted by it, so an `owner` created
+  "in a branch" landed directly on main. The 19 such resources (`user`,
+  `group`, `permission`, `token`, `owner`, `owner_group`, `custom_field`,
+  `custom_field_choice_set`, `custom_link`, `export_template`,
+  `saved_filter`, `bookmark`, `script`, `webhook`, `event_rule`,
+  `notification_group`, `data_source`, `data_file`, `job`) are marked
+  `branchable=False` in the registry: the client refuses every write to
+  them before any request, `write_resource` and `get_resource_schema`
+  say to create or change them in the NetBox UI, and `search_resources`
+  returns `writable: false`. Reads are unchanged. An integration test
+  checks the list against the live `branching` object-type feature.
+  The refusal links to the NetBox page only when the optional
+  `NETBOX_UI_URL` (NetBox's browser address) is set, otherwise it gives
+  the page path: `NETBOX_URL` is often internal (`http://netbox:8080` in
+  Docker) and is never used for links.
+- `get_resource_schema` exposes the fields of inline nested objects
+  instead of an empty `reference_by` (NETBOX-137). Front/rear port
+  mappings (`rear_ports` / `front_ports`, NetBox 4.5+) and cable
+  `a_terminations` / `b_terminations` now show the expected shape, e.g.
+  `[{position, rear_port, rear_port_position}]`.
+
 ### Changed
 
 - `fastmcp` and `mcp` are bounded to one major version, `fastmcp>=4.1,<5`
@@ -15,6 +70,14 @@ All notable changes to this project will be documented in this file.
 - Dependabot (`.github/dependabot.yml`) opens weekly PRs against
   `development` for pip and GitHub Actions updates; minor and patch bumps
   are grouped, each major bump gets its own PR (NETBOX-119).
+- Minimum versions raised by Dependabot: `fastmcp>=4.2.0,<5`,
+  `uvicorn>=0.54.0`, `anyio>=4.16.0`; dev: `pytest>=9.2.0`,
+  `pytest-mock>=3.17.0`, `pre-commit>=4.7.0`, `ruff==0.17.5`. GitHub
+  Actions moved to `actions/checkout@v7`, `actions/setup-python@v7` and
+  the v4/v7 Docker actions.
+- CI also runs on pull requests to `development`, so Dependabot's PRs are
+  tested. A unit test fails when the pre-commit ruff hook's `rev` differs
+  from the `ruff==` pin, since Dependabot only bumps the latter.
 - `ToolAnnotations` use the MCP SDK v2 field names (`read_only_hint`,
   `destructive_hint`, `idempotent_hint`); the wire format is unchanged.
 

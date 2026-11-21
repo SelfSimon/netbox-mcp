@@ -45,3 +45,14 @@ class NetBoxNoBranchError(NetBoxClientError):
     `main` without a human merge approval. Raised client-side, before the
     request even reaches NetBox.
     """
+
+
+class NetBoxNotBranchableError(NetBoxClientError):
+    """A write was attempted on a resource netbox_branching does not version.
+
+    netbox_branching ignores `X-NetBox-Branch` for models without change
+    logging or exempted by the plugin (users, tokens, permissions, owners,
+    webhooks, custom fields, ...): the write would land directly on `main`
+    with no human review (NETBOX-142). Raised client-side, before any
+    request is sent; these objects are created by hand in the NetBox UI.
+    """

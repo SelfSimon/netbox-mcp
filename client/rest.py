@@ -25,11 +25,12 @@ from .config import ClientSettings, get_settings
 from .exceptions import (
     NetBoxConnectionError,
     NetBoxNoBranchError,
+    NetBoxNotBranchableError,
     NetBoxNotFoundError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
-from .registry import get_model_spec
+from .registry import ModelSpec, get_model_spec
 
 BRANCH_HEADER = "X-NetBox-Branch"
 
@@ -56,6 +57,22 @@ def _bounded_params(filters: dict[str, Any] | None) -> dict[str, Any]:
     return params
 
 
+def not_branchable_message(resource: str, spec: ModelSpec, ui_url: str = "") -> str:
+    """Why `resource` cannot be written, and where to do it by hand.
+
+    `ui_url` is NETBOX_UI_URL: with it the message holds a full link,
+    without it only the page's path — NETBOX_URL may be an internal address
+    the user's browser cannot open, so it is never used here.
+    """
+    where = f": {ui_url}/{spec.rest_path}" if ui_url else f", page /{spec.rest_path}"
+    return (
+        f"{spec.label!r} ({resource}) cannot be written through this MCP: "
+        "netbox_branching does not version it, so the write would land "
+        "directly on main with no review. Ask the user to create or change "
+        f"it manually in the NetBox UI{where}"
+    )
+
+
 def _safe_json(response: httpx.Response) -> dict[str, Any]:
     try:
         return response.json()
@@ -74,6 +91,23 @@ def _simplify_reference(field: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _is_inline_object(field: dict[str, Any]) -> bool:
+    """A nested object with no id/slug/name is a value written inline
+    (e.g. a front port's `rear_ports` mappings), not a reference to
+    another NetBox object."""
+    children = field.get("children", {})
+    return not any(key in children for key in ("id", "slug", "name"))
+
+
+def _simplify_children(field: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for name, child in field.get("children", {}).items():
+        simplified = _simplify_field(child)
+        if simplified is not None:
+            result[name] = simplified
+    return result
+
+
 def _simplify_field(field: dict[str, Any]) -> dict[str, Any] | None:
     """Reduce one raw DRF OPTIONS field to what write_resource() needs.
 
@@ -83,10 +117,24 @@ def _simplify_field(field: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     if field.get("type") == "nested object":
+        if _is_inline_object(field):
+            return {
+                "type": "object",
+                "required": field.get("required", False),
+                "label": field.get("label", ""),
+                "fields": _simplify_children(field),
+            }
         return _simplify_reference(field)
 
     child = field.get("child")
     if isinstance(child, dict) and child.get("type") == "nested object":
+        if _is_inline_object(child):
+            return {
+                "type": "list[object]",
+                "required": field.get("required", False),
+                "label": field.get("label", ""),
+                "fields": _simplify_children(child),
+            }
         reference = _simplify_reference(child)
         return {
             "type": "list[reference]",
@@ -229,7 +277,7 @@ class NetBoxRestClient:
     # -- Write ---------------------------------------------------------
 
     def create(self, resource: str, data: dict[str, Any]) -> dict[str, Any]:
-        spec = get_model_spec(resource)
+        spec = self._writable_spec(resource)
         response = self._request("POST", spec.rest_path, json=data)
         return response.json()
 
@@ -237,7 +285,7 @@ class NetBoxRestClient:
         self, resource: str, object_id: int, data: dict[str, Any]
     ) -> dict[str, Any]:
         """Full replacement (PUT) of the `object_id` object."""
-        spec = get_model_spec(resource)
+        spec = self._writable_spec(resource)
         response = self._request("PUT", f"{spec.rest_path}{object_id}/", json=data)
         return response.json()
 
@@ -245,7 +293,7 @@ class NetBoxRestClient:
         self, resource: str, object_id: int, data: dict[str, Any]
     ) -> dict[str, Any]:
         """Partial update (PATCH) of the `object_id` object."""
-        spec = get_model_spec(resource)
+        spec = self._writable_spec(resource)
         response = self._request("PATCH", f"{spec.rest_path}{object_id}/", json=data)
         return response.json()
 
@@ -257,15 +305,25 @@ class NetBoxRestClient:
         review gate, which this client never allows. Raises
         NetBoxNoBranchError before any request is sent if no branch is set.
         """
+        spec = self._writable_spec(resource)
         if not self._branch:
             raise NetBoxNoBranchError(
                 "delete() requires an active netbox_branching branch; "
                 "direct writes to main are not allowed"
             )
-        spec = get_model_spec(resource)
         self._request("DELETE", f"{spec.rest_path}{object_id}/")
 
     # -- Internals -------------------------------------------------------
+
+    def _writable_spec(self, resource: str) -> ModelSpec:
+        """The resource's spec, or NetBoxNotBranchableError when
+        netbox_branching would send the write straight to main."""
+        spec = get_model_spec(resource)
+        if not spec.branchable:
+            raise NetBoxNotBranchableError(
+                not_branchable_message(resource, spec, self._settings.netbox_ui_url)
+            )
+        return spec
 
     def _page(self, path: str, filters: dict[str, Any] | None = None) -> dict[str, Any]:
         params = _bounded_params(filters)

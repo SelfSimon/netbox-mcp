@@ -3,6 +3,7 @@ from client.exceptions import (
     NetBoxConfigurationError,
     NetBoxConnectionError,
     NetBoxNoBranchError,
+    NetBoxNotBranchableError,
     NetBoxNotFoundError,
     NetBoxPermissionError,
     NetBoxValidationError,
@@ -17,6 +18,7 @@ def test_all_client_exceptions_derive_from_base():
         NetBoxPermissionError,
         NetBoxConnectionError,
         NetBoxNoBranchError,
+        NetBoxNotBranchableError,
     ):
         assert issubclass(exc_class, NetBoxClientError)
 

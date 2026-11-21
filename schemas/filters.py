@@ -87,6 +87,14 @@ class DeviceFilter(_FilterBase):
     q: str | None = None
     name: str | None = None
     site_id: int | None = None
+    location_id: int | None = Field(
+        None,
+        description=(
+            "Devices in this location or any of its child locations "
+            "(NetBox includes descendants)."
+        ),
+    )
+    rack_id: int | None = None
     role_id: int | None = None
     device_type_id: int | None = None
     manufacturer_id: int | None = None
