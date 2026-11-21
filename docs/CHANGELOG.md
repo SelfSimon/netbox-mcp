@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.3.0] - 2026-11-21
+
+Nothing to change to deploy: same configuration as 0.2.0.
+
 ### Added
 
 - `get_branch_diff` tool, read-only (NETBOX-104): what a branch changes
