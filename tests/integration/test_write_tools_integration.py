@@ -217,3 +217,69 @@ def test_get_branch_diff_shows_the_fields_an_update_changes(branch):
 def test_get_branch_diff_on_an_unknown_branch_is_not_found():
     with pytest.raises(NetBoxNotFoundError, match="schema_id"):
         write.get_branch_diff("zzzzzzzz")
+
+
+def _unused_main_tenant() -> dict:
+    """A tenant on main nothing is assigned to, safe to delete in a branch."""
+    with NetBoxRestClient() as main_client:
+        for t in main_client.list("tenant", {"limit": 1000}):
+            if not any(v for k, v in t.items() if k.endswith("_count")):
+                return t
+    pytest.skip("needs a tenant on main that nothing is assigned to")
+
+
+def test_get_branch_diff_leaves_out_objects_created_then_deleted():
+    # NETBOX-144: netbox_branching keeps an object created then deleted in
+    # the branch as a `create` with no data; the diff must not show it.
+    main_tenant = _unused_main_tenant()
+    s = uuid.uuid4().hex[:8]
+    branch = write.create_branch(f"netbox-mcp-test-144-{s}")["schema_id"]
+    with NetBoxRestClient(branch=branch) as client:
+        mfr = client.create("manufacturer", {"name": f"m-{s}", "slug": f"m-{s}"})
+        role = client.create("device_role", {"name": f"r-{s}", "slug": f"r-{s}"})
+        site = client.create("site", {"name": f"s-{s}", "slug": f"s-{s}"})
+        dt = client.create(
+            "device_type",
+            {"manufacturer": mfr["id"], "model": f"dt-{s}", "slug": f"dt-{s}"},
+        )
+        for i in range(3):
+            client.create(
+                "interface_template",
+                {"device_type": dt["id"], "name": f"eth{i}", "type": "1000base-t"},
+            )
+        device = {
+            "name": f"d-{s}",
+            "device_type": dt["id"],
+            "role": role["id"],
+            "site": site["id"],
+        }
+        # Deleted then recreated: the first device and its 3 interfaces
+        # must not show up.
+        first = client.create("device", device)
+        client.delete("device", first["id"])
+        second = client.create("device", device)
+        # create -> update -> delete: nothing to show.
+        tmp = client.create("site", {"name": f"tmp-{s}", "slug": f"tmp-{s}"})
+        client.patch("site", tmp["id"], {"description": "short-lived"})
+        client.delete("site", tmp["id"])
+        # On main, updated then deleted in the branch: a single delete.
+        client.patch("tenant", main_tenant["id"], {"description": "doomed"})
+        client.delete("tenant", main_tenant["id"])
+
+    diff = write.get_branch_diff(branch, limit=1000)
+
+    by_type: dict[str, list] = {}
+    for entry in diff["results"]:
+        by_type.setdefault(entry["object_type"], []).append(entry)
+    assert all(e["data"] for e in diff["results"] if e["action"] == "create")
+    assert [e["object_id"] for e in by_type["dcim.device"]] == [second["id"]]
+    assert len(by_type["dcim.interface"]) == 3
+    assert len(by_type["dcim.interfacetemplate"]) == 3
+    assert [e["object_id"] for e in by_type["dcim.site"]] == [site["id"]]
+    assert [e["object_id"] for e in by_type["dcim.manufacturer"]] == [mfr["id"]]
+    assert [(e["object_id"], e["action"]) for e in by_type["tenancy.tenant"]] == [
+        (main_tenant["id"], "delete")
+    ]
+    # manufacturer, role, site, device type, 3 templates, device, 3 interfaces
+    assert diff["summary"] == {"create": 11, "update": 0, "delete": 1}
+    assert diff["count"] == 12

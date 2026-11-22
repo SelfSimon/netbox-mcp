@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.3.1] - 2026-11-22
+
+Nothing to change to deploy: same configuration as 0.3.0.
+
+### Fixed
+
+- `get_branch_diff` no longer lists an object created then deleted in the
+  branch, and no longer counts it in `summary` (NETBOX-144).
+  netbox_branching keeps such an object as a `create` with no data, which
+  showed up as an empty `data: {}` entry. These objects end up neither in
+  `main` nor in the branch, and the merge skips them. The tool now reads
+  every change in the branch and filters by `object_type` and `action`
+  itself, so `count` and `next_offset` only cover real changes.
+
 ## [0.3.0] - 2026-11-21
 
 Nothing to change to deploy: same configuration as 0.2.0.

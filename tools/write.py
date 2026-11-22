@@ -170,31 +170,43 @@ def get_branch_diff(
       branch did, as `{field: {"original", "branch", "main"}}` — point
       them out to the user, the merge will need them acknowledged.
 
+    An object created then deleted in the branch is left out: it ends up
+    neither in main nor in the branch, and the merge skips it.
+
     Filter with `object_type` ("dcim.device") or `action`. `summary` counts
     the branch's changes per action, whatever the filters. Returns
     `{branch, summary, count, returned, offset, truncated, next_offset,
     results}`; when `truncated` is true, continue from `next_offset`.
     """
-    params: dict[str, Any] = {"limit": limit, "ordering": "object_type,object_id"}
-    if offset:
-        params["offset"] = offset
-    if object_type:
-        params["object_type"] = object_type
-    if action:
-        params["action"] = action
+    # The whole branch is read: no-op entries can only be told apart from
+    # their content (NETBOX-144), and the summary covers every change.
     with _client() as client:
-        page = branch_client.list_changes(client, branch, params)
-        summary = {
-            name: branch_client.count_changes(client, branch, {"action": name})
-            for name in branch_client.CHANGE_ACTIONS
-        }
-    first = page["results"][0] if page["results"] else {}
-    page["results"] = [branch_client.summarize_change(c) for c in page["results"]]
-    return {
-        "branch": (first.get("branch") or {}).get("name", branch),
-        "summary": summary,
-        **list_response(page),
+        changes = [
+            c
+            for c in branch_client.list_all_changes(
+                client, branch, {"ordering": "object_type,object_id"}
+            )
+            if not branch_client.is_noop(c)
+        ]
+    summary = {name: 0 for name in branch_client.CHANGE_ACTIONS}
+    for c in changes:
+        summary[c["action"]["value"]] += 1
+    selected = [
+        c
+        for c in changes
+        if (not object_type or c["object_type"] == object_type)
+        and (not action or c["action"]["value"] == action)
+    ]
+    page = {
+        "count": len(selected),
+        "limit": limit,
+        "offset": offset,
+        "results": [
+            branch_client.summarize_change(c) for c in selected[offset : offset + limit]
+        ],
     }
+    name = (changes[0]["branch"] or {}).get("name") if changes else None
+    return {"branch": name or branch, "summary": summary, **list_response(page)}
 
 
 _CREATE_ANNOTATIONS = ToolAnnotations(destructive_hint=False, idempotent_hint=False)
