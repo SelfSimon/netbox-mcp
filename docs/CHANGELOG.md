@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.3.1] - 2026-11-22
+
+Nothing to change to deploy: same configuration as 0.3.0.
+
 ### Fixed
 
 - `get_branch_diff` no longer lists an object created then deleted in the
