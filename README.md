@@ -98,9 +98,10 @@ site, device, interface, ip_address, and vlan (`list_*`/`get_*` in
 device and interface create/update, IP address assignment, and
 `netbox_branching` branch create/list (`tools/write.py`, same
 registration point) — every create/update tool requires an active branch,
-and merge stays a human-only action in the NetBox UI. Since reads always
-target `main`, `get_branch_diff` (read-only, NETBOX-104) shows what a
-branch changes before that review: one entry per changed object, with the
+and merge stays a human-only action in the NetBox UI. Reads target `main`,
+or a branch when given its `schema_id` in `branch` (NETBOX-145).
+`get_branch_diff` (read-only, NETBOX-104) shows what a branch changes
+before that review: one entry per changed object, with the
 new object's fields (create), `{before, after}` per altered field
 (update), or its identity (delete), plus any conflict with `main`.
 
@@ -111,7 +112,9 @@ tools instead of a dedicated one per object: `search_resources`,
 `get_resource`, `get_resource_schema`, and `write_resource`
 (`tools/generic.py`) — `get_resource_schema` discovers a resource's
 required/optional fields and valid values before you call `write_resource`
-on it. 19 of them (users, groups, permissions, tokens, owners, custom
+on it. `write_resource` also creates or patches many objects of one
+resource in a single call when `data` is a list (up to 250 elements,
+all or nothing — NETBOX-146). 19 of them (users, groups, permissions, tokens, owners, custom
 fields, webhooks, event rules, core objects, ...) are read-only through
 the MCP: netbox_branching does not version them, so a write would land
 directly on `main` — create or change them in the NetBox UI

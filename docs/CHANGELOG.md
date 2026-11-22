@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.4.0] - 2026-11-22
+
+Nothing to change to deploy: same configuration as 0.3.2.
+
+### Added
+
+- Read tools (`list_*`, `get_*`, `get_resource`) take an optional `branch`
+  (a `schema_id`) to read as of that branch, its unmerged writes included;
+  without it they read `main` as before (NETBOX-145).
+- `write_resource` creates or patches up to 250 objects of one resource in
+  a single call when `data` is a list; a batch is all or nothing, and a
+  rejected one names the element (index in `data`) and field at fault. A
+  batch patch checks its ids first, since NetBox silently skips an unknown
+  one (NETBOX-146).
+
+### Changed
+
+- A request on a branch that does not exist now says "no branch with
+  schema_id ..." (not found), and one on a branch not ready yet says to
+  wait, instead of `data rejected by NetBox (400): {}` (NETBOX-145).
+
 ## [0.3.2] - 2026-11-22
 
 Nothing to change to deploy: same configuration as 0.3.1.

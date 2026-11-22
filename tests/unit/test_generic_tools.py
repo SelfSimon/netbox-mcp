@@ -1,11 +1,13 @@
 import asyncio
+import json
 
 import httpx
 import pytest
 from fastmcp import FastMCP
 
 from client.config import ClientSettings
-from client.rest import BRANCH_HEADER, NetBoxRestClient
+from client.exceptions import NetBoxNotFoundError, NetBoxValidationError
+from client.rest import BRANCH_HEADER, MAX_BATCH_SIZE, NetBoxRestClient
 from tools import generic
 from tools.response import ResponseTooLargeError
 
@@ -453,3 +455,205 @@ def test_get_resource_still_reads_a_non_branchable_resource(monkeypatch):
     monkeypatch.setattr(generic, "_client", lambda branch=None: make_client(handler))
 
     assert generic.get_resource("owner", object_id=1)["name"] == "Nord Quantique"
+
+
+def test_get_resource_reads_in_the_branch_it_is_given(monkeypatch):
+    # NETBOX-145
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers.get("X-NetBox-Branch"))
+        return httpx.Response(200, json={"count": 0, "next": None, "results": []})
+
+    monkeypatch.setattr(
+        generic, "_client", lambda branch=None: make_client(handler, branch)
+    )
+    generic.get_resource("rack", branch="br1")
+    generic.get_resource("rack")
+    assert seen == ["br1", None]
+
+
+# -- Batches (NETBOX-146) ----------------------------------------------------
+
+
+def _batch_client(monkeypatch, handler):
+    monkeypatch.setattr(
+        generic, "_client", lambda branch=None: make_client(handler, branch=branch)
+    )
+
+
+def _template(i: int, **extra) -> dict:
+    return {
+        "id": i,
+        "url": f"http://nb/api/dcim/interface-templates/{i}/",
+        "display": f"eth{i}",
+        "name": f"eth{i}",
+        "type": {"value": "1000base-t"},
+        **extra,
+    }
+
+
+def test_a_create_batch_is_one_post_of_the_whole_list(monkeypatch):
+    sent = []
+
+    def handler(request):
+        sent.append((request.method, request.url.path, json.loads(request.content)))
+        body = json.loads(request.content)
+        return httpx.Response(201, json=[_template(10 + i) for i in range(len(body))])
+
+    _batch_client(monkeypatch, handler)
+    data = [
+        {"device_type": 1, "name": f"eth{i}", "type": "1000base-t"} for i in range(3)
+    ]
+
+    result = generic.write_resource("interface_template", "create", "br1", data=data)
+
+    assert sent == [("POST", "/api/dcim/interface-templates/", data)]
+    assert result == {
+        "count": 3,
+        "results": [
+            {
+                "id": i,
+                "url": f"http://nb/api/dcim/interface-templates/{i}/",
+                "display": f"eth{i}",
+            }
+            for i in (10, 11, 12)
+        ],
+    }
+
+
+def test_a_patch_batch_checks_the_ids_then_sends_one_patch(monkeypatch):
+    sent = []
+
+    def handler(request):
+        sent.append((request.method, str(request.url.params)))
+        if request.method == "GET":
+            return httpx.Response(
+                200, json={"count": 2, "results": [{"id": 4}, {"id": 5}]}
+            )
+        assert json.loads(request.content) == data
+        return httpx.Response(200, json=[_template(4), _template(5)])
+
+    _batch_client(monkeypatch, handler)
+    data = [{"id": 4, "name": "up0"}, {"id": 5, "name": "up1"}]
+
+    result = generic.write_resource("interface_template", "patch", "br1", data=data)
+
+    assert sent == [("GET", "id=4&id=5&fields=id&limit=2"), ("PATCH", "")]
+    assert [r["id"] for r in result["results"]] == [4, 5]
+
+
+def test_a_patch_batch_with_an_unknown_id_changes_nothing(monkeypatch):
+    # NetBox would skip an unknown id silently and apply the others.
+    methods = []
+
+    def handler(request):
+        methods.append(request.method)
+        return httpx.Response(200, json={"count": 1, "results": [{"id": 4}]})
+
+    _batch_client(monkeypatch, handler)
+
+    with pytest.raises(NetBoxNotFoundError, match=r"id \[999\]; nothing was changed"):
+        generic.write_resource(
+            "interface_template",
+            "patch",
+            "br1",
+            data=[{"id": 4, "name": "a"}, {"id": 999, "name": "b"}],
+        )
+    assert methods == ["GET"]
+
+
+@pytest.mark.parametrize(
+    ("data", "match"),
+    [
+        ([{"id": 4}, {"name": "b"}], r"element 1 has no integer `id`"),
+        ([{"id": 4}, {"id": True}], r"element 1 has no integer `id`"),
+        ([{"id": 4}, {"id": 4}], r"ids \[4\] appear more than once"),
+        ([], r"at least one element"),
+        ([{"id": i} for i in range(MAX_BATCH_SIZE + 1)], r"at most 250 elements"),
+        ([{"id": 4}, "x"], r"element 1 of the batch is not an object"),
+    ],
+)
+def test_a_malformed_patch_batch_sends_nothing(monkeypatch, data, match):
+    def handler(request):
+        raise AssertionError(f"no request expected, got {request.method}")
+
+    _batch_client(monkeypatch, handler)
+    with pytest.raises(NetBoxValidationError, match=match):
+        generic.write_resource("interface_template", "patch", "br1", data=data)
+
+
+def test_a_rejected_create_batch_names_the_element_and_field(monkeypatch):
+    def handler(request):
+        return httpx.Response(
+            400, json=[{}, {}, {"type": ["nope is not a valid choice."]}, {}]
+        )
+
+    _batch_client(monkeypatch, handler)
+    with pytest.raises(
+        NetBoxValidationError,
+        match=r"nothing was written: element 2: type: nope is not a valid choice\.$",
+    ):
+        generic.write_resource("interface_template", "create", "br1", data=[{}] * 4)
+
+
+def test_a_rejected_patch_batch_finds_the_element_netbox_does_not_name(monkeypatch):
+    # NetBox answers a batch PATCH with one element's errors, no index.
+    def handler(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200, json={"count": 3, "results": [{"id": 4}, {"id": 5}, {"id": 6}]}
+            )
+        return httpx.Response(400, json={"type": ["nope is not a valid choice."]})
+
+    _batch_client(monkeypatch, handler)
+    data = [
+        {"id": 4, "type": "1000base-t"},
+        {"id": 5, "type": "nope"},
+        {"id": 6, "name": "x"},
+    ]
+    with pytest.raises(
+        NetBoxValidationError,
+        match=r"nothing was changed: element 1 \(id 5\): type: nope is not",
+    ):
+        generic.write_resource("interface_template", "patch", "br1", data=data)
+
+
+def test_a_rejected_patch_batch_says_when_netbox_names_no_element(monkeypatch):
+    def handler(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200, json={"count": 2, "results": [{"id": 4}, {"id": 5}]}
+            )
+        return httpx.Response(400, json={"__all__": ["Name already exists."]})
+
+    _batch_client(monkeypatch, handler)
+    with pytest.raises(NetBoxValidationError, match=r"an element NetBox does not name"):
+        generic.write_resource(
+            "interface_template",
+            "patch",
+            "br1",
+            data=[{"id": 4, "name": "dup"}, {"id": 5, "name": "dup"}],
+        )
+
+
+@pytest.mark.parametrize(
+    ("action", "kwargs", "match"),
+    [
+        ("update", {}, r"takes one object at a time"),
+        ("delete", {"confirm": True}, r"takes one object at a time"),
+        ("patch", {"object_id": 3}, r"a batch takes no object_id"),
+    ],
+)
+def test_a_batch_is_only_for_create_and_patch(action, kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        generic.write_resource("rack", action, "br1", data=[{"id": 3}], **kwargs)
+
+
+def test_a_batch_of_a_non_branchable_resource_is_refused():
+    with pytest.raises(ValueError, match="netbox_branching does not version"):
+        generic.write_resource("owner", "create", "br1", data=[{"name": "x"}])
+
+
+def test_write_resource_documents_the_batch_limit():
+    assert f"at most {MAX_BATCH_SIZE}" in generic.write_resource.__doc__

@@ -20,9 +20,9 @@ in Confluence, not here.
    renamed templates, a device deleted then recreated, and the exact
    `get_branch_diff` of all that. A failure names the step and what
    differed. Its owner check skips unless an owner `netbox-mcp-test`
-   exists in dev (owners are created in the NetBox UI). An `XPASS` means a
-   feature tracked by an xfail (NETBOX-145, NETBOX-146) now works: turn
-   it into a plain test. The session deletes every branch it created, so
+   exists in dev (owners are created in the NetBox UI). A step that needs a
+   feature not built yet is a strict xfail tied to its ticket; an `XPASS`
+   means that feature now works: turn it into a plain test. The session deletes every branch it created, so
    no test data stays in dev; run it against dev only, never prod.
 1. Bump `version` in
    [pyproject.toml](https://github.com/SelfSimon/netbox-mcp/blob/main/pyproject.toml)

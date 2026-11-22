@@ -839,3 +839,41 @@ def test_not_branchable_message_links_the_ui_url_never_netbox_url():
 
     assert with_ui.endswith("NetBox UI: https://netbox.example.com/users/owners/")
     assert without_ui.endswith("NetBox UI, page /users/owners/")
+
+
+def test_an_unknown_branch_says_to_pass_a_schema_id():
+    # NETBOX-145: netbox_branching answers a plain-text 400.
+    def handler(request):
+        return httpx.Response(400, text="Invalid branch identifier")
+
+    with (
+        make_client(handler, branch="zzzzzzzz") as client,
+        pytest.raises(
+            NetBoxNotFoundError, match=r"no branch with schema_id 'zzzzzzzz'"
+        ),
+    ):
+        client.get("site", 1)
+
+
+def test_a_branch_not_ready_says_to_wait():
+    def handler(request):
+        return httpx.Response(
+            400, text="Branch b1 is not ready for use (status: provisioning)"
+        )
+
+    with (
+        make_client(handler, branch="abcd1234") as client,
+        pytest.raises(NetBoxValidationError, match=r"provisioning\)\. Wait until"),
+    ):
+        client.list_page("site")
+
+
+def test_a_plain_text_400_keeps_netbox_text():
+    def handler(request):
+        return httpx.Response(400, text="Something odd")
+
+    with (
+        make_client(handler) as client,
+        pytest.raises(NetBoxValidationError, match=r"\(400\): Something odd$"),
+    ):
+        client.get("site", 1)

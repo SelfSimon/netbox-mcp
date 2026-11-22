@@ -38,6 +38,9 @@ BRANCH_HEADER = "X-NetBox-Branch"
 # caller gives no `limit`, and never more than `MAX_LIST_LIMIT` per request.
 DEFAULT_LIST_LIMIT = 50
 MAX_LIST_LIMIT = 1000
+# Largest batch create_many()/patch_many() send in one request (NETBOX-146):
+# NetBox applies a batch in one transaction, so keep it reviewable.
+MAX_BATCH_SIZE = 250
 
 
 def _bounded_params(filters: dict[str, Any] | None) -> dict[str, Any]:
@@ -73,11 +76,51 @@ def not_branchable_message(resource: str, spec: ModelSpec, ui_url: str = "") -> 
     )
 
 
-def _safe_json(response: httpx.Response) -> dict[str, Any]:
+def _safe_json(response: httpx.Response) -> Any:
     try:
         return response.json()
     except ValueError:
         return {}
+
+
+def _field_errors(errors: dict[str, Any]) -> str:
+    """`{"type": ["x is not a valid choice."]}` as `type: x is not a valid
+    choice.`, one field after the other."""
+    parts = []
+    for field, messages in errors.items():
+        if isinstance(messages, list):
+            messages = " ".join(str(m) for m in messages)
+        parts.append(f"{field}: {messages}")
+    return "; ".join(parts)
+
+
+def _batch_errors(errors: list[Any]) -> str:
+    """NetBox's per-element errors of a batch (a list, `{}` for each
+    element it accepted) as `element 2: type: ...`."""
+    return "; ".join(
+        f"element {index}: {_field_errors(e) if isinstance(e, dict) else e}"
+        for index, e in enumerate(errors)
+        if e
+    )
+
+
+def _guess_patch_culprits(errors: dict[str, Any], items: list[dict]) -> list[int]:
+    """The elements of a batch PATCH that may have caused `errors`.
+
+    NetBox answers a rejected batch PATCH with the errors of one element
+    and no index (it validates in its own order, not the request's): the
+    culprits are the elements that set a field in error, narrowed to
+    those whose value the message quotes when that leaves any.
+    """
+    fields = [f for f in errors if f not in ("__all__", "non_field_errors")]
+    candidates = [i for i, item in enumerate(items) if any(f in item for f in fields)]
+    text = " ".join(str(m) for m in errors.values())
+    quoted = [
+        i
+        for i in candidates
+        if any(str(items[i][f]) in text for f in fields if f in items[i])
+    ]
+    return quoted or candidates
 
 
 def _detail(response: httpx.Response, limit: int = 300) -> str:
@@ -94,6 +137,19 @@ def _detail(response: httpx.Response, limit: int = 300) -> str:
         return ""
     text = " ".join(str(text).split())
     return f": {text[:limit]}{'...' if len(text) > limit else ''}"
+
+
+def _check_batch(items: list[dict[str, Any]]) -> None:
+    if not items:
+        raise NetBoxValidationError("a batch needs at least one element")
+    if len(items) > MAX_BATCH_SIZE:
+        raise NetBoxValidationError(
+            f"a batch holds at most {MAX_BATCH_SIZE} elements, got {len(items)}: "
+            "split it into several calls"
+        )
+    bad = [i for i, item in enumerate(items) if not isinstance(item, dict)]
+    if bad:
+        raise NetBoxValidationError(f"element {bad[0]} of the batch is not an object")
 
 
 def _simplify_reference(field: dict[str, Any]) -> dict[str, Any]:
@@ -297,6 +353,80 @@ class NetBoxRestClient:
         response = self._request("POST", spec.rest_path, json=data)
         return response.json()
 
+    def create_many(
+        self, resource: str, items: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Create every object of `items` in ONE request (NETBOX-146).
+
+        NetBox applies the batch in one transaction: if any element is
+        rejected, nothing is created, and the error names each rejected
+        element by its index in `items`.
+        """
+        spec = self._writable_spec(resource)
+        _check_batch(items)
+        response = self._request("POST", spec.rest_path, json=items)
+        return response.json()
+
+    def patch_many(
+        self, resource: str, items: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Partially update several objects in ONE request (NETBOX-146);
+        each element of `items` holds the `id` of its object and the
+        fields to change.
+
+        All or nothing, like create_many(). The ids are checked first:
+        NetBox would silently skip an unknown one and apply the others.
+        """
+        spec = self._writable_spec(resource)
+        _check_batch(items)
+        ids = [item.get("id") for item in items]
+        bad = [
+            i
+            for i, v in enumerate(ids)
+            if not isinstance(v, int) or isinstance(v, bool)
+        ]
+        if bad:
+            raise NetBoxValidationError(
+                f"patch_many({resource!r}): element {bad[0]} has no integer `id`; "
+                "each element must hold the id of the object it changes"
+            )
+        if len(set(ids)) != len(ids):
+            dup = sorted({v for v in ids if ids.count(v) > 1})
+            raise NetBoxValidationError(
+                f"patch_many({resource!r}): ids {dup} appear more than once; "
+                "merge their changes into one element each"
+            )
+        found = self._request(
+            "GET",
+            spec.rest_path,
+            params={"id": ids, "fields": "id", "limit": len(ids)},
+        ).json()["results"]
+        missing = sorted(set(ids) - {o["id"] for o in found})
+        if missing:
+            raise NetBoxNotFoundError(
+                f"PATCH {spec.rest_path}: no {resource} with id {missing}; "
+                "nothing was changed"
+            )
+        try:
+            response = self._request("PATCH", spec.rest_path, json=items)
+        except NetBoxValidationError as exc:
+            if not isinstance(exc.errors, dict) or not exc.errors:
+                raise
+            culprits = _guess_patch_culprits(exc.errors, items)
+            which = (
+                f"element {culprits[0]} (id {ids[culprits[0]]})"
+                if len(culprits) == 1
+                else f"one of the elements {culprits}"
+                if culprits
+                else "an element NetBox does not name"
+            )
+            raise NetBoxValidationError(
+                f"PATCH {spec.rest_path}: batch rejected by NetBox (400), "
+                f"nothing was changed: {which}: {_field_errors(exc.errors)}",
+                errors=exc.errors,
+            ) from None
+        return response.json()
+
     def update(
         self, resource: str, object_id: int, data: dict[str, Any]
     ) -> dict[str, Any]:
@@ -351,6 +481,22 @@ class NetBoxRestClient:
             "results": payload["results"],
         }
 
+    def _raise_branch_refusal(self, method: str, path: str, text: str) -> None:
+        """Turn netbox_branching's plain-text refusals of `X-NetBox-Branch`
+        into errors that say what to do (NETBOX-145). Returns for any other
+        text."""
+        if text == "Invalid branch identifier":
+            raise NetBoxNotFoundError(
+                f"{method} {path}: no branch with schema_id {self._branch!r}. "
+                "Pass the `schema_id` of a branch from list_branches(), not "
+                "its name or id."
+            )
+        if "is not ready for use" in text:
+            raise NetBoxValidationError(
+                f"{method} {path}: {text}. Wait until list_branches() shows "
+                "it ready, then try again."
+            )
+
     def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         try:
             response = self._client.request(method, path, **kwargs)
@@ -373,8 +519,17 @@ class NetBoxRestClient:
             )
         if code == 400:
             errors = _safe_json(response)
+            if not errors and self._branch:
+                self._raise_branch_refusal(method, path, response.text.strip())
+            if isinstance(errors, list):
+                raise NetBoxValidationError(
+                    f"{method} {path}: batch rejected by NetBox (400), nothing "
+                    f"was written: {_batch_errors(errors) or errors}",
+                    errors=errors,
+                )
             raise NetBoxValidationError(
-                f"{method} {path}: data rejected by NetBox (400): {errors}",
+                f"{method} {path}: data rejected by NetBox (400): "
+                f"{errors or _detail(response)[2:]}",
                 errors=errors,
             )
         if code == 429:

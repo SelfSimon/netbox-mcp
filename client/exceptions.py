@@ -24,7 +24,7 @@ class NetBoxNotFoundError(NetBoxClientError):
 class NetBoxValidationError(NetBoxClientError):
     """The submitted data was rejected by NetBox (400)."""
 
-    def __init__(self, message: str, errors: dict | None = None) -> None:
+    def __init__(self, message: str, errors: dict | list | None = None) -> None:
         super().__init__(message)
         self.errors = errors or {}
 

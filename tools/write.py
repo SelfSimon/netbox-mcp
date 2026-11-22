@@ -155,11 +155,13 @@ def get_branch_diff(
 ) -> dict[str, Any]:
     """Show what a branch changes compared with main, for review. Read-only.
 
-    Reads never see a branch (they target `main`), so this is the way to
-    check what your writes actually did: call it after the writes of a
-    task, before telling the user the branch is ready for review — then
+    This is the way to check what your writes actually did, as a whole:
+    call it after the writes of a task, before telling the user the branch
+    is ready for review — then
     give them the branch name and a short summary of this diff. It never
     changes the branch; merging stays a human action in the NetBox UI.
+    For one object's full state in the branch (e.g. every interface of a
+    device created there), pass `branch` to the read tools instead.
 
     `branch` is the branch's schema_id (as for the write tools). One entry
     per object changed in the branch, grouped by object type:

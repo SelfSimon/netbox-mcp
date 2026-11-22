@@ -40,7 +40,7 @@ def test_truncated_list_stays_under_one_megabyte_on_the_wire(monkeypatch, char):
             json={"count": 50, "next": None, "previous": None, "results": devices},
         )
 
-    def make_client() -> NetBoxRestClient:
+    def make_client(branch: str | None = None) -> NetBoxRestClient:
         settings = ClientSettings(
             netbox_url="http://netbox.local", netbox_api_token="token123"
         )

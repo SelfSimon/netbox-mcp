@@ -22,7 +22,8 @@
 - `schemas/` — Pydantic filter + write schemas, one set per covered object
   type; `choices.py` has hand-copied NetBox enums.
 - `tools/read.py` / `tools/write.py` — MCP tool defs; writes always require
-  a `branch` param routed via `X-NetBox-Branch`; reads always target `main`.
+  a `branch` param routed via `X-NetBox-Branch`; reads target `main` unless
+  given the optional `branch` (NETBOX-145).
 - `tools/generic.py` — `search_resources`/`get_resource`/`write_resource`,
   covering every resource in `client/registry.py` that has no dedicated
   tool; same `branch`/`main` rules as above.

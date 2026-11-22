@@ -27,8 +27,9 @@ MCP_PORT = int(os.environ.get("MCP_PORT", "8765"))
 INSTRUCTIONS = """\
 This server reads and writes a NetBox instance over its REST API.
 
-Reads always target `main`. Every `list_*` tool, get_resource() without an
-`object_id`, search_resources() and list_branches() return an envelope:
+Reads target `main` unless you pass `branch` (a schema_id). Every `list_*`
+tool, get_resource() without an `object_id`, search_resources() and
+list_branches() return an envelope:
 `{count, returned, offset, truncated, next_offset, results}`. `count` is the
 total in NetBox; when `truncated` is true you have not seen everything —
 call again with `offset=next_offset`, or narrow the filters. Lists hold 50
@@ -39,8 +40,9 @@ minimal representation (no custom fields, tags or related objects).
 Writes never touch `main`: every write tool needs a `branch`, the
 `schema_id` of a netbox_branching branch. Create ONE branch per task with
 create_branch() and reuse it for every related write; check list_branches()
-before creating another. Reads cannot see a branch: to check what your
-writes did, call get_branch_diff() on it. Merging a branch is a human
+before creating another. To check what your writes did, call
+get_branch_diff() on the branch for the overview, and pass `branch` to the
+read tools for an object's full state in it. Merging a branch is a human
 action in the NetBox UI — this server cannot do it, so tell the user which
 branch to review, with a short summary of its diff.
 Resources search_resources() marks `writable: false` (users, tokens,
@@ -54,7 +56,10 @@ then use get_resource() / write_resource(). Call get_resource_schema()
 before write_resource() to learn the required fields and valid values.
 With write_resource(), prefer `action="patch"` (only the fields you change)
 over `action="update"` (a full replacement that needs every required
-field). `action="delete"` needs `confirm=True`.
+field). `action="delete"` needs `confirm=True`. To create or patch many
+objects of one resource, pass `data` as a list in ONE write_resource() call
+(up to 250; a patch element holds its object's `id`) rather than one call
+per object: the batch is all or nothing.
 """
 
 mcp = FastMCP(name="netbox-mcp", instructions=INSTRUCTIONS)
