@@ -203,27 +203,36 @@ enough that a dedicated tool becomes the exception rather than the norm.
 
 ## Plugins
 
-**How the MCP should handle plugin objects is not decided yet (NETBOX-117).**
-None of the plugins installed on the production instance
-(`netbox-custom-config`, NetBox v4.6.5-5.0.2) has a resource in
-`client/registry.py`, so their objects are reachable through neither the
-dedicated nor the generic tools. `netbox_security` is the priority. Which
-of these plugins actually expose REST objects worth covering (some are
-UI-only) is part of NETBOX-117's inventory.
+Decided in NETBOX-117: plugin objects are registry entries like any other
+(under `plugins/`, NETBOX-149), reachable through the generic tools; their
+label names the plugin, so `search_resources("netbox_security")` lists
+them. Every one is versioned by netbox_branching, so the same branch rules
+apply. `tests/integration/test_rest_integration.py` checks that every
+registered path is still a live NetBox endpoint, which catches a plugin
+upgrade that renames or drops one (NETBOX-143).
 
 Versions below mirror `docs/plugins.md` in
 [netbox-custom-config](https://github.com/DistriQ-Zone/netbox-custom-config/blob/main/docs/plugins.md),
 which is the source of truth — check it before trusting this table.
 
-| Plugin | Version | REST endpoint | Registry | Read filter | Write schema | Dedicated tool |
-|---|---|---|---|---|---|---|
-| `netbox_security` | 1.5.11 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
-| `netbox_attachments` | 11.3.1 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
-| `netbox_topology_views` | 4.5.1 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
-| `netbox_topology_explorer` | 0.2.0 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
-| `netbox_device_view` | 0.4.0 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
-| `netbox_reorder_rack` | 1.1.4 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
-| `netbox_contextmenus` | 1.4.14 | `plugins/…` — to inventory | ⬜ | ⬜ | ⬜ | ⬜ |
+| Plugin | Version | REST endpoint | Registry | Dedicated tool |
+|---|---|---|---|---|
+| `netbox_security` | 1.5.11 | `plugins/netbox-security/` (29 resources) | ✅ | ⬜ |
+| `netbox_device_view` | 0.4.0 | `plugins/device_view/device-view/` (`device_view`) | ✅ | ⬜ grid generator: NETBOX-150 |
+| `netbox_attachments` | 11.3.1 | `plugins/netbox-attachments/` (`attachment` 🔒, `attachment_assignment`) | ✅ | ⬜ |
+| `netbox_topology_views` | 4.5.1 | `plugins/netbox_topology_views/` — map coordinates | not covered | — |
+| `netbox_reorder_rack` | 1.1.4 | none (empty API root) | not covered | — |
+| `netbox_topology_explorer` | 0.2.0 | none (UI only) | not covered | — |
+| `netbox_contextmenus` | 1.4.14 | none (UI only) | not covered | — |
+
+- `attachment` is read-only through the MCP although it is versioned: an
+  attachment is a file upload, which the JSON payloads of `write_resource`
+  cannot carry (`ModelSpec.read_only`). Attach an existing file to an
+  object with `attachment_assignment`.
+- Known plugin bugs (netbox_security 1.5.11, netbox_attachments 11.3.1):
+  every read of `firewall_filter_rule_from_setting` and
+  `firewall_filter_rule_then_setting` answers 500, and
+  `attachment_assignment` answers 500 when `brief=True`.
 
 `netbox_branching` (1.1.3) is also installed but deliberately kept out of
 the registry — see below.

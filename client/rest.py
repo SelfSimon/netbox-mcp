@@ -27,6 +27,7 @@ from .exceptions import (
     NetBoxNoBranchError,
     NetBoxNotBranchableError,
     NetBoxNotFoundError,
+    NetBoxNotWritableError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
@@ -60,19 +61,25 @@ def _bounded_params(filters: dict[str, Any] | None) -> dict[str, Any]:
     return params
 
 
-def not_branchable_message(resource: str, spec: ModelSpec, ui_url: str = "") -> str:
-    """Why `resource` cannot be written, and where to do it by hand.
+def not_writable_message(resource: str, spec: ModelSpec, ui_url: str = "") -> str:
+    """Why `resource` cannot be written, and where to do it by hand: not
+    versioned by netbox_branching, or a `read_only` reason.
 
     `ui_url` is NETBOX_UI_URL: with it the message holds a full link,
     without it only the page's path — NETBOX_URL may be an internal address
     the user's browser cannot open, so it is never used here.
     """
     where = f": {ui_url}/{spec.rest_path}" if ui_url else f", page /{spec.rest_path}"
+    why = (
+        spec.read_only
+        if spec.branchable
+        else "netbox_branching does not version it, so the write would land "
+        "directly on main with no review"
+    )
     return (
         f"{spec.label!r} ({resource}) cannot be written through this MCP: "
-        "netbox_branching does not version it, so the write would land "
-        "directly on main with no review. Ask the user to create or change "
-        f"it manually in the NetBox UI{where}"
+        f"{why}. Ask the user to create or change it manually in the NetBox "
+        f"UI{where}"
     )
 
 
@@ -540,11 +547,15 @@ class NetBoxRestClient:
 
     def _writable_spec(self, resource: str) -> ModelSpec:
         """The resource's spec, or NetBoxNotBranchableError when
-        netbox_branching would send the write straight to main."""
+        netbox_branching would send the write straight to main, or
+        NetBoxNotWritableError when the MCP only reads it (`read_only`)."""
         spec = get_model_spec(resource)
-        if not spec.branchable:
-            raise NetBoxNotBranchableError(
-                not_branchable_message(resource, spec, self._settings.netbox_ui_url)
+        if not spec.writable:
+            error = (
+                NetBoxNotWritableError if spec.branchable else NetBoxNotBranchableError
+            )
+            raise error(
+                not_writable_message(resource, spec, self._settings.netbox_ui_url)
             )
         return spec
 

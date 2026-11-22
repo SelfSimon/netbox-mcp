@@ -52,7 +52,8 @@ change them manually in the NetBox UI.
 
 site, device, interface, ip_address and vlan have dedicated tools; prefer
 them. For any other object type, find its name with search_resources(),
-then use get_resource() / write_resource(). Call get_resource_schema()
+then use get_resource() / write_resource() — plugin objects too, e.g.
+search_resources("netbox_security"). Call get_resource_schema()
 before write_resource() to learn the required fields and valid values.
 With write_resource(), prefer `action="patch"` (only the fields you change)
 over `action="update"` (a full replacement that needs every required

@@ -28,7 +28,7 @@ from client.rest import (
     DEFAULT_LIST_LIMIT,
     MAX_LIST_LIMIT,
     NetBoxRestClient,
-    not_branchable_message,
+    not_writable_message,
 )
 from netbox_mcp.auth import get_current_token
 from tools.response import (
@@ -76,10 +76,11 @@ def _validate_resource(resource: str) -> None:
 
 def _validate_writable(resource: str) -> None:
     """Refuse resources netbox_branching does not version (NETBOX-142): a
-    write would reach main directly, so they are created by hand."""
+    write would reach main directly, so they are created by hand. Same for
+    the resources the MCP only reads (`ModelSpec.read_only`)."""
     spec = get_model_spec(resource)
-    if not spec.branchable:
-        raise ValueError(not_branchable_message(resource, spec, get_ui_url()))
+    if not spec.writable:
+        raise ValueError(not_writable_message(resource, spec, get_ui_url()))
 
 
 def search_resources(
@@ -98,8 +99,14 @@ def search_resources(
 
     `writable` is false for the resources netbox_branching does not
     version (users, groups, permissions, tokens, owners, custom fields,
-    webhooks, event rules, ...): they can be read, but write_resource()
-    refuses them — the user creates or changes them in the NetBox UI.
+    webhooks, event rules, ...) and for plugin file uploads
+    (netbox_attachments' `attachment`): they can be read, but
+    write_resource() refuses them — the user creates or changes them in
+    the NetBox UI.
+
+    Plugin objects are listed too, with the plugin in their label: query
+    "netbox_security" (firewall filters, NAT, security zones, address
+    sets, ...), "netbox_device_view" or "netbox_attachments".
 
     Returns `{count, returned, offset, truncated, next_offset, results}`;
     the default `limit` covers the whole registry in one call.
@@ -115,7 +122,7 @@ def search_resources(
                 "resource": name,
                 "label": spec.label,
                 "rest_path": spec.rest_path,
-                "writable": spec.branchable,
+                "writable": spec.writable,
             }
         )
     return list_response(

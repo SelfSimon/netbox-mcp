@@ -375,3 +375,44 @@ def test_get_resource_schema_lists_the_device_custom_fields(device_custom_fields
 
     assert fields[device_custom_fields["text"]]["type"] == "text"
     assert fields[device_custom_fields["integer"]]["type"] == "integer"
+
+
+def test_write_resource_creates_a_netbox_security_zone_in_the_branch_only(branch):
+    # NETBOX-149: plugin objects go through the generic tools and the branch.
+    name = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
+    created = generic.write_resource(
+        "security_zone", "create", branch=branch, data={"name": name}
+    )
+
+    in_branch = generic.get_resource(
+        "security_zone", filters={"name": name}, branch=branch
+    )
+    on_main = generic.get_resource("security_zone", filters={"name": name})
+    diff = write.get_branch_diff(
+        branch, object_type="netbox_security.securityzone", limit=1000
+    )
+
+    assert in_branch["count"] == 1
+    assert on_main["count"] == 0
+    assert created["id"] in {e["object_id"] for e in diff["results"]}
+
+
+def test_write_resource_creates_a_device_view_for_a_device_type(branch, device_prereqs):
+    css = '.deviceview.area {\n  grid-template-areas: "x x";\n}'
+    created = generic.write_resource(
+        "device_view",
+        "create",
+        branch=branch,
+        data={"device_type": device_prereqs["device_type"], "grid_template_area": css},
+    )
+
+    view = generic.get_resource("device_view", object_id=created["id"], branch=branch)
+    # netbox_device_view serializes device_type as a bare id.
+    assert view["device_type"] == device_prereqs["device_type"]
+    assert view["grid_template_area"] == css
+
+
+def test_get_resource_schema_describes_a_plugin_resource():
+    schema = generic.get_resource_schema("security_zone")
+
+    assert schema["name"]["required"] is True

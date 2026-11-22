@@ -5,6 +5,7 @@ from client.exceptions import (
     NetBoxNoBranchError,
     NetBoxNotBranchableError,
     NetBoxNotFoundError,
+    NetBoxNotWritableError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
@@ -19,6 +20,7 @@ def test_all_client_exceptions_derive_from_base():
         NetBoxConnectionError,
         NetBoxNoBranchError,
         NetBoxNotBranchableError,
+        NetBoxNotWritableError,
     ):
         assert issubclass(exc_class, NetBoxClientError)
 
@@ -34,3 +36,7 @@ def test_validation_error_defaults_errors_to_empty_dict():
     exc = NetBoxValidationError("bad data")
 
     assert exc.errors == {}
+
+
+def test_not_branchable_is_a_kind_of_not_writable():
+    assert issubclass(NetBoxNotBranchableError, NetBoxNotWritableError)

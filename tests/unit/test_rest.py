@@ -8,11 +8,12 @@ from client.exceptions import (
     NetBoxNoBranchError,
     NetBoxNotBranchableError,
     NetBoxNotFoundError,
+    NetBoxNotWritableError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
 from client.registry import get_model_spec
-from client.rest import BRANCH_HEADER, NetBoxRestClient, not_branchable_message
+from client.rest import BRANCH_HEADER, NetBoxRestClient, not_writable_message
 
 
 def make_client(handler, branch: str | None = None) -> NetBoxRestClient:
@@ -822,6 +823,18 @@ def test_writes_to_a_non_branchable_resource_are_refused_before_any_request(
         getattr(client, method)(*args)
 
 
+def test_writes_to_a_read_only_resource_are_refused_with_its_reason():
+    # NETBOX-149: branchable, but a file upload the JSON payload cannot carry.
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request may reach NetBox")
+
+    client = make_client(handler, branch="br1")
+
+    with pytest.raises(NetBoxNotWritableError, match="file upload") as excinfo:
+        client.create("attachment", {"name": "x"})
+    assert not isinstance(excinfo.value, NetBoxNotBranchableError)
+
+
 def test_reads_of_a_non_branchable_resource_still_work():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/users/owners/1/"
@@ -830,12 +843,12 @@ def test_reads_of_a_non_branchable_resource_still_work():
     assert make_client(handler).get("owner", 1)["name"] == "Nord Quantique"
 
 
-def test_not_branchable_message_links_the_ui_url_never_netbox_url():
+def test_not_writable_message_links_the_ui_url_never_netbox_url():
     # NETBOX_URL may be internal (http://netbox:8080 in Docker): never a link.
     spec = get_model_spec("owner")
 
-    with_ui = not_branchable_message("owner", spec, "https://netbox.example.com")
-    without_ui = not_branchable_message("owner", spec)
+    with_ui = not_writable_message("owner", spec, "https://netbox.example.com")
+    without_ui = not_writable_message("owner", spec)
 
     assert with_ui.endswith("NetBox UI: https://netbox.example.com/users/owners/")
     assert without_ui.endswith("NetBox UI, page /users/owners/")

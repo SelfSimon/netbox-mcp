@@ -80,7 +80,7 @@
 - `netbox_branching` branches are write-only from MCP: no `merge()`/`sync()`/
   `revert()`/`archive()` by design — merging into `main` is a human action in
   the NetBox UI. Do not add these.
-- Only 5 of the 115 registered resources (site, device, interface, ip_address,
+- Only 5 of the 147 registered resources (site, device, interface, ip_address,
   vlan) have dedicated schemas + tools; everything else in
   `client/registry.py` is reachable generically via `tools/generic.py`
   (`search_resources`/`get_resource`/`write_resource` — no per-object
@@ -92,3 +92,9 @@
   (NETBOX-142). A newly registered resource must be checked —
   `pytest -m integration -k branchable` compares the registry with the
   live `branching` object-type feature.
+- Plugin resources (NETBOX-149) are plain registry entries under
+  `plugins/`, labelled `"... (<plugin>)"`. `ModelSpec(read_only="why")`
+  refuses writes to a branchable resource the MCP cannot write (a file
+  upload: `attachment`); `spec.writable` is what the write checks use.
+  After a plugin upgrade, run `pytest -m integration -k live_netbox`: it
+  checks every registered path is still a NetBox endpoint.

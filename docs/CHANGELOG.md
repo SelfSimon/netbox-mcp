@@ -14,6 +14,14 @@ All notable changes to this project will be documented in this file.
 - `get_resource_schema` lists the custom fields defined for the resource
   (type, required, default, choice set or related object type) instead of
   a bare `custom_fields: field` entry (NETBOX-141).
+- Plugin objects in the generic tools (NETBOX-149): the 29 resources of
+  `netbox_security` (security zones and policies, NAT, firewall filters,
+  address and application sets, ...), `device_view` (`netbox_device_view`)
+  and `attachment_assignment` (`netbox_attachments`), written in a branch
+  like any other resource. `search_resources("netbox_security")` lists
+  them.
+- `attachment` (`netbox_attachments`) is readable but refused by
+  `write_resource`: it is a file upload, which a JSON payload cannot carry.
 
 ## [0.4.0] - 2026-11-22
 
