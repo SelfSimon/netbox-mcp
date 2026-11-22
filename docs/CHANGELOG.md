@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- `create_branch` no longer hides a branch it created (NETBOX-147). When
+  the branch is not ready in time, the error now gives its name and
+  `schema_id`, says it exists, and tells the caller to reuse it instead of
+  creating another. Names with an en-dash, `/`, accents or emoji work:
+  that was not the cause of the `fetch failed` seen in prod.
+
+### Changed
+
+- Every NetBox error now gives its HTTP code and, when NetBox sends one,
+  NetBox's own message (for example `permission denied by NetBox (403):
+  ...`, `data rejected by NetBox (400): ...`). Non-JSON answers, such as a
+  proxy's HTML page, are shortened.
+
 ## [0.3.1] - 2026-11-22
 
 Nothing to change to deploy: same configuration as 0.3.0.

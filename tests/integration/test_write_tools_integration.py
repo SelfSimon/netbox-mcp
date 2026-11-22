@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 
-from client.exceptions import NetBoxNotFoundError
+from client.exceptions import NetBoxNotFoundError, NetBoxValidationError
 from client.rest import NetBoxRestClient
 from schemas.writes import (
     DeviceCreate,
@@ -283,3 +283,32 @@ def test_get_branch_diff_leaves_out_objects_created_then_deleted():
     # manufacturer, role, site, device type, 3 templates, device, 3 interfaces
     assert diff["summary"] == {"create": 11, "update": 0, "delete": 1}
     assert diff["count"] == 12
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Test - ascii seulement",
+        "Test – en-dash",
+        "Test / slash",
+        "Test accentué éàç",
+        "Test – combiné / éàç",
+    ],
+)
+def test_create_branch_accepts_non_ascii_and_slashes(name):
+    # NETBOX-147: an en-dash and a `/` were suspected of breaking create_branch.
+    full_name = f"{name} {uuid.uuid4().hex[:6]}"
+
+    created = write.create_branch(full_name)
+
+    assert created["name"] == full_name
+    assert created["status"]["value"] == "ready"
+    listed = write.list_branches(limit=1000)["results"]
+    assert [b["name"] for b in listed if b["schema_id"] == created["schema_id"]] == [
+        full_name
+    ]
+
+
+def test_create_branch_refusal_says_what_netbox_answered():
+    with pytest.raises(NetBoxValidationError, match=r"\(400\): .*100 characters"):
+        write.create_branch("x" * 101)

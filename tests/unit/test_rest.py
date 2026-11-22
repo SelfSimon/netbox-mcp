@@ -3,6 +3,7 @@ import pytest
 
 from client.config import ClientSettings
 from client.exceptions import (
+    NetBoxClientError,
     NetBoxConnectionError,
     NetBoxNoBranchError,
     NetBoxNotBranchableError,
@@ -245,8 +246,34 @@ def test_error_status_codes_map_to_client_exceptions(status_code, expected_excep
 
     client = make_client(handler)
 
-    with pytest.raises(expected_exception):
+    with pytest.raises(expected_exception, match=rf"\({status_code}\)"):
         client.create("device", {"name": "sw01"})
+
+
+@pytest.mark.parametrize("status_code", [401, 403, 404, 500, 502, 418])
+def test_errors_carry_netbox_own_detail(status_code):
+    # NETBOX-147: an error must say what NetBox answered, not just fail.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, json={"detail": "Invalid v1 token"})
+
+    client = make_client(handler)
+
+    with pytest.raises(NetBoxClientError, match=r"\(\d{3}\): Invalid v1 token$"):
+        client.create("device", {"name": "sw01"})
+
+
+def test_errors_keep_a_non_json_answer_short():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502, text="<html>\n  Bad   gateway " + "x" * 1000)
+
+    client = make_client(handler)
+
+    with pytest.raises(NetBoxConnectionError) as exc_info:
+        client.create("device", {"name": "sw01"})
+    message = str(exc_info.value)
+    assert "(502): <html> Bad gateway x" in message
+    assert message.endswith("...")
+    assert len(message) < 400
 
 
 def test_timeout_raises_connection_error():

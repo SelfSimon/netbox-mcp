@@ -123,15 +123,28 @@ def test_wait_until_ready_raises_on_failed_status(monkeypatch):
 
 def test_wait_until_ready_raises_on_timeout(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"id": 7, "status": status("provisioning")})
+        return httpx.Response(
+            200,
+            json={
+                "id": 7,
+                "name": "Test – combiné / éàç",
+                "schema_id": "ab12cd34",
+                "status": status("provisioning"),
+            },
+        )
 
     times = iter([0, 1, 2, 100])
     monkeypatch.setattr("client.branches.time.monotonic", lambda: next(times))
     monkeypatch.setattr("client.branches.time.sleep", lambda _: None)
     client = make_client(handler)
 
-    with pytest.raises(NetBoxClientError):
+    # NETBOX-147: the branch exists; the caller must not make another.
+    with pytest.raises(NetBoxClientError) as exc_info:
         wait_until_ready(client, 7, timeout=5, poll_interval=0.01)
+    message = str(exc_info.value)
+    assert "'Test – combiné / éàç' (schema_id ab12cd34) was created" in message
+    assert "not ready after 5s (status: provisioning)" in message
+    assert "Do not create another" in message
 
 
 def test_branches_module_has_no_merge_sync_revert_archive():
