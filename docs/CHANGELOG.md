@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.4.0] - 2026-11-22
+
+Nothing to change to deploy: same configuration as 0.3.2.
+
 ### Added
 
 - Read tools (`list_*`, `get_*`, `get_resource`) take an optional `branch`
