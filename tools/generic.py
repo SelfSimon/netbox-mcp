@@ -134,14 +134,19 @@ def get_resource(
     offset: _Offset = 0,
     brief: bool = False,
     fields: list[str] | None = None,
+    branch: str | None = None,
 ) -> Any:
     """Read a NetBox object of any resource type registered in
     client/registry.py (see search_resources() for valid names).
 
     Pass `object_id` to fetch a single object; otherwise `filters` (raw
     NetBox REST query params, e.g. {"name": "dc1"}) narrows a list, or
-    omit both to list the first page. Always targets `main` — no branch
-    scoping, same as the dedicated read tools.
+    omit both to list the first page.
+
+    Pass `branch`, the `schema_id` of a branch from list_branches(), to
+    read as of that branch, its unmerged writes included; without it,
+    reads `main`. Resources search_resources() marks `writable: false`
+    are not versioned: they read the same with or without a branch.
 
     A list is returned as `{count, returned, offset, truncated,
     next_offset, results}`: `count` is the total matching in NetBox, and
@@ -157,7 +162,7 @@ def get_resource(
     """
     _validate_resource(resource)
     selection = selection_params(brief, fields)
-    with _client() as client:
+    with _client(branch or None) as client:
         if object_id is not None:
             return object_response(client.get(resource, object_id, selection))
         params = {"limit": limit, **(filters or {}), **selection}
@@ -177,8 +182,8 @@ def get_resource_schema(resource: str) -> dict[str, Any]:
     existing object, not that object's own writable fields. Recommended
     before write_resource() on any resource without a dedicated tool
     (site, device, interface, ip_address, vlan already have precise
-    Pydantic schemas and don't need this). Always targets `main`, same as
-    get_resource()/search_resources() — no branch scoping.
+    Pydantic schemas and don't need this). Always targets `main`: a
+    resource's fields are the same in every branch.
 
     Refused for resources search_resources() marks `writable: false`.
     """

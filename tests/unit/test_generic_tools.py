@@ -453,3 +453,19 @@ def test_get_resource_still_reads_a_non_branchable_resource(monkeypatch):
     monkeypatch.setattr(generic, "_client", lambda branch=None: make_client(handler))
 
     assert generic.get_resource("owner", object_id=1)["name"] == "Nord Quantique"
+
+
+def test_get_resource_reads_in_the_branch_it_is_given(monkeypatch):
+    # NETBOX-145
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers.get("X-NetBox-Branch"))
+        return httpx.Response(200, json={"count": 0, "next": None, "results": []})
+
+    monkeypatch.setattr(
+        generic, "_client", lambda branch=None: make_client(handler, branch)
+    )
+    generic.get_resource("rack", branch="br1")
+    generic.get_resource("rack")
+    assert seen == ["br1", None]

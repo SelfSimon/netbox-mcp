@@ -351,6 +351,22 @@ class NetBoxRestClient:
             "results": payload["results"],
         }
 
+    def _raise_branch_refusal(self, method: str, path: str, text: str) -> None:
+        """Turn netbox_branching's plain-text refusals of `X-NetBox-Branch`
+        into errors that say what to do (NETBOX-145). Returns for any other
+        text."""
+        if text == "Invalid branch identifier":
+            raise NetBoxNotFoundError(
+                f"{method} {path}: no branch with schema_id {self._branch!r}. "
+                "Pass the `schema_id` of a branch from list_branches(), not "
+                "its name or id."
+            )
+        if "is not ready for use" in text:
+            raise NetBoxValidationError(
+                f"{method} {path}: {text}. Wait until list_branches() shows "
+                "it ready, then try again."
+            )
+
     def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         try:
             response = self._client.request(method, path, **kwargs)
@@ -373,8 +389,11 @@ class NetBoxRestClient:
             )
         if code == 400:
             errors = _safe_json(response)
+            if not errors and self._branch:
+                self._raise_branch_refusal(method, path, response.text.strip())
             raise NetBoxValidationError(
-                f"{method} {path}: data rejected by NetBox (400): {errors}",
+                f"{method} {path}: data rejected by NetBox (400): "
+                f"{errors or _detail(response)[2:]}",
                 errors=errors,
             )
         if code == 429:

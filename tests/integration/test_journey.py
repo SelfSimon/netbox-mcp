@@ -263,7 +263,6 @@ def test_step_6_recreated_device_gets_the_renamed_interfaces(journey):
         expect(names, ["eth2", "eth3", "uplink0", "uplink1"], "interface names")
 
 
-@pytest.mark.xfail(strict=True, reason="reads in a branch: NETBOX-145")
 def test_step_7_reads_in_the_branch_see_the_current_names(journey):
     with step(7, "read the recreated device's interfaces in the branch"):
         found = call(
@@ -273,6 +272,96 @@ def test_step_7_reads_in_the_branch_see_the_current_names(journey):
         )
         names = sorted(i["name"] for i in found["results"])
         expect(names, ["eth2", "eth3", "uplink0", "uplink1"], "interface names")
+
+
+def test_step_7_reads_without_branch_do_not_see_the_branch(journey):
+    with step(7, "read the branch's devices on main"):
+        for d in (journey["switch"], journey["server"]):
+            found = call("list_devices", filters={"name": d["name"]})
+            expect(found["results"], [], f"device {d['name']} on main")
+
+
+def test_step_7_get_device_in_the_branch_sees_its_rack(journey):
+    with step(7, "get the recreated device in the branch"):
+        d = call(
+            "get_device", device_id=journey["switch"]["id"], branch=journey["branch"]
+        )
+        expect((d.get("rack") or {}).get("id"), journey["rack"]["id"], "rack")
+
+
+def test_step_7_reads_in_an_unknown_branch_say_so(journey):
+    with pytest.raises(ToolError, match=r"no branch with schema_id 'zzzzzzzz'"):
+        call("list_devices", branch="zzzzzzzz")
+
+
+def test_templates_renamed_between_two_devices_read_in_the_branch():
+    """NETBOX-145 ticket scenario: a device type with 3 interface templates,
+    a device, one template renamed, a second device. In the branch each
+    device has the interface names of its creation time; on main, neither
+    exists."""
+    s = uuid.uuid4().hex[:6]
+    with step(1, "create a branch"):
+        b = call("create_branch", name=f"netbox-mcp-test-145-{s}")["schema_id"]
+
+    def create(resource: str, data: dict[str, Any]) -> dict[str, Any]:
+        return call(
+            "write_resource", resource=resource, action="create", branch=b, data=data
+        )
+
+    with step(2, "device type with 3 templates, then a first device"):
+        mfr = create("manufacturer", {"name": f"mfr-{s}", "slug": f"mfr-{s}"})
+        dt = create(
+            "device_type",
+            {"manufacturer": mfr["id"], "model": f"dt-{s}", "slug": f"dt-{s}"},
+        )
+        templates = [
+            create(
+                "interface_template",
+                {"device_type": dt["id"], "name": f"eth{i}", "type": "1000base-t"},
+            )
+            for i in range(3)
+        ]
+        site = create("site", {"name": f"site-{s}", "slug": f"site-{s}"})
+        role = create("device_role", {"name": f"role-{s}", "slug": f"role-{s}"})
+
+        def device(name: str) -> dict[str, Any]:
+            payload = {
+                "name": name,
+                "device_type": dt["id"],
+                "role": role["id"],
+                "site": site["id"],
+            }
+            return call("create_device", payload=payload, branch=b)
+
+        first = device(f"d1-{s}")
+
+    with step(3, "rename a template, then a second device"):
+        call(
+            "write_resource",
+            resource="interface_template",
+            action="patch",
+            branch=b,
+            object_id=templates[0]["id"],
+            data={"name": "uplink0"},
+        )
+        second = device(f"d2-{s}")
+
+    with step(4, "read both devices and their interfaces with and without branch"):
+        for d, names in (
+            (first, ["eth0", "eth1", "eth2"]),
+            (second, ["eth1", "eth2", "uplink0"]),
+        ):
+            got = call("get_device", device_id=d["id"], branch=b)
+            expect(got["name"], d["name"], "device read in the branch")
+            found = call("list_interfaces", filters={"device_id": d["id"]}, branch=b)
+            expect(
+                sorted(i["name"] for i in found["results"]),
+                names,
+                f"interfaces of {d['name']} in the branch",
+            )
+            # By name: a branch id may also be taken by another object on main.
+            on_main = call("list_devices", filters={"name": d["name"]})
+            expect(on_main["results"], [], f"{d['name']} on main")
 
 
 @pytest.mark.xfail(strict=True, reason="batch writes: NETBOX-146")
