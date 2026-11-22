@@ -5,6 +5,25 @@ publishing the image to GHCR. Rolling that image out to Distriq's server
 (bumping the tag in `netbox-custom-config` and redeploying) is documented
 in Confluence, not here.
 
+0. On `development`, run the whole test suite against the dev NetBox, with
+   a personal token that may add and delete branches there:
+   ```sh
+   export $(grep -v '^#' .env | xargs)   # NETBOX_URL, NETBOX_TEST_TOKEN
+   pytest -m "not integration"
+   pytest -m integration
+   ```
+   Any failure blocks the release. `pytest -m integration` includes the
+   reference journey
+   ([tests/integration/test_journey.py](https://github.com/SelfSimon/netbox-mcp/blob/main/tests/integration/test_journey.py),
+   NETBOX-148): a branch with an accented name, two device types with
+   their interface templates, racked devices with tenant and owner,
+   renamed templates, a device deleted then recreated, and the exact
+   `get_branch_diff` of all that. A failure names the step and what
+   differed. Its owner check skips unless an owner `netbox-mcp-test`
+   exists in dev (owners are created in the NetBox UI). An `XPASS` means a
+   feature tracked by an xfail (NETBOX-145, NETBOX-146) now works: turn
+   it into a plain test. The session deletes every branch it created, so
+   no test data stays in dev; run it against dev only, never prod.
 1. Bump `version` in
    [pyproject.toml](https://github.com/SelfSimon/netbox-mcp/blob/main/pyproject.toml)
    to `X.Y.Z`.

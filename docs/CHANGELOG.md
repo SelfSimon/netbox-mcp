@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.3.2] - 2026-11-22
+
+Nothing to change to deploy: same configuration as 0.3.1.
+
+### Added
+
+- A reference journey, `tests/integration/test_journey.py`, run before
+  every release (NETBOX-148, `docs/RELEASING.md` step 0). It calls the MCP
+  tools over the MCP protocol, as a client does, in one branch: an
+  accented branch name, two device types with interface templates, racked
+  devices with tenant and owner, renamed templates, a device deleted then
+  recreated. It then checks interface inheritance and the exact
+  `get_branch_diff` (net counts, no ghost entry, final names). A failure
+  names the step and what differed. Branch reads (NETBOX-145) and batch
+  writes (NETBOX-146) are strict xfails until those tickets are done.
+- Integration tests no longer leave data on the test instance: the
+  session deletes every branch it created, and sites created on main for
+  the read tests are deleted after each test. The test token needs
+  `netbox_branching.delete_branch` and site deletion in dev.
+
+### Fixed
+
+- `create_branch` no longer hides a branch it created (NETBOX-147). When
+  the branch is not ready in time, the error now gives its name and
+  `schema_id`, says it exists, and tells the caller to reuse it instead of
+  creating another. Names with an en-dash, `/`, accents or emoji work:
+  that was not the cause of the `fetch failed` seen in prod.
+
+### Changed
+
+- Every NetBox error now gives its HTTP code and, when NetBox sends one,
+  NetBox's own message (for example `permission denied by NetBox (403):
+  ...`, `data rejected by NetBox (400): ...`). Non-JSON answers, such as a
+  proxy's HTML page, are shortened.
+
 ## [0.3.1] - 2026-11-22
 
 Nothing to change to deploy: same configuration as 0.3.0.

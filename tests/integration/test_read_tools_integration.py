@@ -3,8 +3,8 @@
 Requires NETBOX_URL / NETBOX_TEST_TOKEN (see conftest.py) — same
 prerequisites as test_rest_integration.py.
 
-Test objects created here (sites) accumulate in the target instance; clean
-them up periodically by hand, same as test_rest_integration.py.
+The sites created here, on main since reads only see main, are deleted
+after each test (conftest.py `main_site`, NETBOX-148).
 """
 
 import uuid
@@ -12,7 +12,6 @@ import uuid
 import pytest
 
 from client.exceptions import NetBoxNotFoundError
-from client.rest import NetBoxRestClient
 from schemas.choices import SiteStatus
 from schemas.filters import InterfaceFilter, SiteFilter
 from tools import read
@@ -20,10 +19,9 @@ from tools import read
 pytestmark = pytest.mark.integration
 
 
-def test_list_sites_and_get_site_round_trip():
-    slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
-    with NetBoxRestClient() as bootstrap_client:
-        created = bootstrap_client.create("site", {"name": slug, "slug": slug})
+def test_list_sites_and_get_site_round_trip(main_site):
+    created = main_site()
+    slug = created["slug"]
 
     matches = read.list_sites(SiteFilter(slug=slug))
     assert [s["slug"] for s in matches["results"]] == [slug]
@@ -34,7 +32,7 @@ def test_list_sites_and_get_site_round_trip():
     assert fetched["slug"] == slug
 
 
-def test_status_filter_is_honored_by_netbox_not_silently_ignored():
+def test_status_filter_is_honored_by_netbox_not_silently_ignored(main_site):
     """Regression test for the to_params() enum-serialization bug: before
     the fix, a status filter was sent as the literal string
     "SiteStatus.ACTIVE" instead of "active". NetBox doesn't recognize
@@ -42,9 +40,7 @@ def test_status_filter_is_honored_by_netbox_not_silently_ignored():
     status=retired would still (wrongly) return a freshly created
     (active) site. Asserting it does NOT catches that regression.
     """
-    slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
-    with NetBoxRestClient() as bootstrap_client:
-        bootstrap_client.create("site", {"name": slug, "slug": slug})
+    slug = main_site()["slug"]
 
     active_matches = read.list_sites(SiteFilter(slug=slug, status=SiteStatus.ACTIVE))
     retired_matches = read.list_sites(SiteFilter(slug=slug, status=SiteStatus.RETIRED))
@@ -53,13 +49,12 @@ def test_status_filter_is_honored_by_netbox_not_silently_ignored():
     assert retired_matches["results"] == []
 
 
-def test_brief_and_fields_are_honored_by_netbox():
+def test_brief_and_fields_are_honored_by_netbox(main_site):
     """NETBOX-114: both are plain query params, so NetBox silently ignores
     them if the deployed version doesn't support them — assert on the keys
     actually returned."""
-    slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
-    with NetBoxRestClient() as bootstrap_client:
-        created = bootstrap_client.create("site", {"name": slug, "slug": slug})
+    created = main_site()
+    slug = created["slug"]
 
     full = read.get_site(created["id"])
     brief = read.get_site(created["id"], brief=True)
@@ -75,12 +70,10 @@ def test_brief_and_fields_are_honored_by_netbox():
     assert "custom_fields" not in listed_brief["results"][0]
 
 
-def test_list_sites_is_bounded_and_reports_the_total():
+def test_list_sites_is_bounded_and_reports_the_total(main_site):
     """NETBOX-113: `limit=1` returns one site, with the real total."""
     for _ in range(2):
-        slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
-        with NetBoxRestClient() as bootstrap_client:
-            bootstrap_client.create("site", {"name": slug, "slug": slug})
+        main_site()
 
     page = read.list_sites(SiteFilter(limit=1))
 

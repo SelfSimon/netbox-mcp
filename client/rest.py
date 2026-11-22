@@ -80,6 +80,22 @@ def _safe_json(response: httpx.Response) -> dict[str, Any]:
         return {}
 
 
+def _detail(response: httpx.Response, limit: int = 300) -> str:
+    """NetBox's own explanation of an error, as ": <text>", or "".
+
+    DRF puts it in `detail`; a proxy or a crash may answer plain text or
+    HTML, kept short.
+    """
+    payload = _safe_json(response)
+    text = payload.get("detail") if isinstance(payload, dict) else None
+    if not text and not payload:
+        text = response.text.strip()
+    if not text:
+        return ""
+    text = " ".join(str(text).split())
+    return f": {text[:limit]}{'...' if len(text) > limit else ''}"
+
+
 def _simplify_reference(field: dict[str, Any]) -> dict[str, Any]:
     children = field.get("children", {})
     reference_by = [key for key in ("id", "slug", "name") if key in children]
@@ -345,30 +361,36 @@ class NetBoxRestClient:
                 f"Failed to connect to NetBox on {method} {path}: {exc}"
             ) from exc
 
-        if response.status_code in (401, 403):
-            raise NetBoxPermissionError(f"{method} {path}: permission denied by NetBox")
-        if response.status_code == 404:
-            raise NetBoxNotFoundError(f"{method} {path}: object not found")
-        if response.status_code == 400:
+        code = response.status_code
+        if code in (401, 403):
+            raise NetBoxPermissionError(
+                f"{method} {path}: permission denied by NetBox ({code})"
+                f"{_detail(response)}"
+            )
+        if code == 404:
+            raise NetBoxNotFoundError(
+                f"{method} {path}: object not found (404){_detail(response)}"
+            )
+        if code == 400:
             errors = _safe_json(response)
             raise NetBoxValidationError(
-                f"{method} {path}: data rejected by NetBox: {errors}",
+                f"{method} {path}: data rejected by NetBox (400): {errors}",
                 errors=errors,
             )
-        if response.status_code == 429:
+        if code == 429:
             raise NetBoxConnectionError(
                 f"{method} {path}: NetBox rate limit reached (429)"
             )
-        if response.status_code >= 500:
+        if code >= 500:
             raise NetBoxConnectionError(
-                f"{method} {path}: NetBox server error ({response.status_code})"
+                f"{method} {path}: NetBox server error ({code}){_detail(response)}"
             )
 
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             raise NetBoxConnectionError(
-                f"{method} {path}: unexpected HTTP error ({response.status_code})"
+                f"{method} {path}: unexpected HTTP error ({code}){_detail(response)}"
             ) from exc
 
         return response

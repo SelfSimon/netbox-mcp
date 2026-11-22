@@ -180,12 +180,21 @@ def wait_until_ready(
     branch = get_branch(client, branch_id)
 
     while branch["status"]["value"] != _READY:
+        which = f"Branch {branch.get('name')!r} (schema_id {branch.get('schema_id')})"
         if branch["status"]["value"] == _FAILED:
-            raise NetBoxClientError(f"Branch {branch_id} provisioning failed")
-        if time.monotonic() >= deadline:
             raise NetBoxClientError(
-                f"Branch {branch_id} did not become ready within {timeout}s "
-                f"(status: {branch['status']['value']})"
+                f"{which} provisioning failed in NetBox: it exists but cannot "
+                "be used. Ask the user to look at it in the NetBox UI."
+            )
+        if time.monotonic() >= deadline:
+            # The branch exists and NetBox keeps provisioning it: say so,
+            # or the caller believes nothing was created and makes another
+            # (NETBOX-147).
+            raise NetBoxClientError(
+                f"{which} was created but is not ready after {timeout:g}s "
+                f"(status: {branch['status']['value']}). Do not create another: "
+                "check list_branches() in a moment and reuse its schema_id "
+                "once its status is ready."
             )
         time.sleep(poll_interval)
         branch = get_branch(client, branch_id)
