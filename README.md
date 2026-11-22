@@ -97,7 +97,8 @@ site, device, interface, ip_address, and vlan (`list_*`/`get_*` in
 `src/netbox_mcp/server.py`). Dedicated write tools are implemented for
 device and interface create/update, IP address assignment, and
 `netbox_branching` branch create/list (`tools/write.py`, same
-registration point) — every create/update tool requires an active branch,
+registration point) — they take `custom_fields` too (NETBOX-141), and
+every create/update tool requires an active branch,
 and merge stays a human-only action in the NetBox UI. Reads target `main`,
 or a branch when given its `schema_id` in `branch` (NETBOX-145).
 `get_branch_diff` (read-only, NETBOX-104) shows what a branch changes

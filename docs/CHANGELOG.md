@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- The dedicated write tools (`create_device`, `update_device`,
+  `create_interface`, `update_interface`, `assign_ip_address`) take
+  `custom_fields` as `{name: value}`, so an object with custom fields no
+  longer needs `write_resource`. An update changes only the custom fields
+  it names; `null` clears one; NetBox validates the values (NETBOX-141).
+- `get_resource_schema` lists the custom fields defined for the resource
+  (type, required, default, choice set or related object type) instead of
+  a bare `custom_fields: field` entry (NETBOX-141).
+
 ## [0.4.0] - 2026-11-22
 
 Nothing to change to deploy: same configuration as 0.3.2.

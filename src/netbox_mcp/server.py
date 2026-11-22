@@ -60,6 +60,10 @@ field). `action="delete"` needs `confirm=True`. To create or patch many
 objects of one resource, pass `data` as a list in ONE write_resource() call
 (up to 250; a patch element holds its object's `id`) rather than one call
 per object: the batch is all or nothing.
+Custom fields go in `custom_fields` as {name: value}, with the dedicated
+write tools or write_resource(); get_resource_schema() lists those defined
+for an object type, e.g. get_resource_schema("device"). An update changes
+only the custom fields it names; null clears one.
 """
 
 mcp = FastMCP(name="netbox-mcp", instructions=INSTRUCTIONS)

@@ -7,9 +7,11 @@ authority regardless of what passes validation here — invalid values raise
 NetBoxValidationError from the client, not from these schemas.
 
 Currently covers device create/update (including rack mounting, platform,
-owner, primary IPs and tags), interface create/update (including PoE,
-802.1Q mode and VLANs, LAG, parent, VRF and tags), and IP address
-assignment — the first slice of write tools. VLAN, site, and
+owner, primary IPs, tags and custom fields), interface create/update
+(including PoE, 802.1Q mode and VLANs, LAG, parent, VRF, tags and custom
+fields), and IP address assignment — the first slice of write tools.
+`custom_fields` is a free dict (NETBOX-141): which custom fields exist is
+NetBox data, not code, so NetBox validates them. VLAN, site, and
 every other NetBox resource get a write schema the same way as their
 write tool is added; the goal is full read/write coverage of the NetBox
 object model, with NetBox's own per-user permissions (not this schema
@@ -60,6 +62,17 @@ _TAGS_DESCRIPTION = (
     "Replaces every tag on the object; the tags must already exist."
 )
 
+_CUSTOM_FIELDS_DESCRIPTION = (
+    'Custom field values by field name, e.g. {"circuit_ref": "X-42"}. '
+    "An update changes only the custom fields named here; null clears one. "
+    "get_resource_schema() lists the custom fields defined for this object "
+    "type with their types; NetBox validates the values."
+)
+
+
+def _custom_fields() -> Any:
+    return Field(None, description=_CUSTOM_FIELDS_DESCRIPTION)
+
 
 class _DeviceFields(_PayloadBase):
     """Optional device fields shared by DeviceCreate and DeviceUpdate."""
@@ -98,6 +111,7 @@ class _DeviceFields(_PayloadBase):
     description: str | None = None
     comments: str | None = None
     tags: list[TagRef] | None = Field(None, description=_TAGS_DESCRIPTION)
+    custom_fields: dict[str, Any] | None = _custom_fields()
 
 
 class DeviceCreate(_DeviceFields):
@@ -147,6 +161,7 @@ class _InterfaceFields(_PayloadBase):
     vrf: int | None = None
     description: str | None = None
     tags: list[TagRef] | None = Field(None, description=_TAGS_DESCRIPTION)
+    custom_fields: dict[str, Any] | None = _custom_fields()
 
 
 class InterfaceCreate(_InterfaceFields):
@@ -174,3 +189,4 @@ class IPAddressAssign(_PayloadBase):
     status: IPAddressStatus = IPAddressStatus.ACTIVE
     dns_name: str | None = None
     description: str | None = None
+    custom_fields: dict[str, Any] | None = _custom_fields()

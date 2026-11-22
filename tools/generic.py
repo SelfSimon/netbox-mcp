@@ -183,8 +183,15 @@ def get_resource_schema(resource: str) -> dict[str, Any]:
     existing object, not that object's own writable fields. Recommended
     before write_resource() on any resource without a dedicated tool
     (site, device, interface, ip_address, vlan already have precise
-    Pydantic schemas and don't need this). Always targets `main`: a
+    Pydantic schemas for their standard fields). Always targets `main`: a
     resource's fields are the same in every branch.
+
+    `custom_fields` lists the custom fields defined for that object type
+    under `fields`, each with its type, whether it is required and, for
+    a selection, its `choice_set` (read its values with
+    get_resource("custom_field_choice_set", object_id=...)). Call it for
+    a dedicated resource too (e.g. "device") before setting
+    `custom_fields` with its write tool.
 
     Refused for resources search_resources() marks `writable: false`.
     """
@@ -225,6 +232,9 @@ def write_resource(
 
     `action="delete"` additionally requires `confirm=True` — it is
     rejected otherwise. `create`/`update`/`patch` ignore `confirm`.
+
+    Custom fields go in `data["custom_fields"]` as {name: value}; a patch
+    changes only the custom fields it names, and null clears one.
 
     Batches: to create or patch many objects of one resource, pass `data`
     as a list in ONE call instead of one call per object (at most 250

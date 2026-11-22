@@ -24,7 +24,7 @@ from schemas.writes import (
     InterfaceUpdate,
     IPAddressAssign,
 )
-from tools import write
+from tools import generic, write
 
 pytestmark = pytest.mark.integration
 
@@ -311,3 +311,67 @@ def test_create_branch_accepts_non_ascii_and_slashes(name):
 def test_create_branch_refusal_says_what_netbox_answered():
     with pytest.raises(NetBoxValidationError, match=r"\(400\): .*100 characters"):
         write.create_branch("x" * 101)
+
+
+@pytest.fixture(scope="module")
+def device_custom_fields():
+    """Two optional custom fields on dcim.device (NETBOX-141).
+
+    Custom fields are not versioned by netbox_branching: they are created
+    on main with a raw request (the client refuses writes to them) and
+    deleted at the end of the module.
+    """
+    suffix = uuid.uuid4().hex[:8]
+    created = []
+    with NetBoxRestClient() as main_client:
+        try:
+            for name, kind in (
+                (f"mcp_test_ref_{suffix}", "text"),
+                (f"mcp_test_n_{suffix}", "integer"),
+            ):
+                response = main_client._request(
+                    "POST",
+                    "extras/custom-fields/",
+                    json={"name": name, "type": kind, "object_types": ["dcim.device"]},
+                )
+                created.append(response.json())
+            yield {"text": created[0]["name"], "integer": created[1]["name"]}
+        finally:
+            for field in created:
+                main_client._request("DELETE", f"extras/custom-fields/{field['id']}/")
+
+
+def test_device_write_tools_set_merge_and_clear_custom_fields(
+    branch, device_prereqs, device_custom_fields
+):
+    text, number = device_custom_fields["text"], device_custom_fields["integer"]
+    payload = _device_payload(device_prereqs, f"netbox-mcp-test-{uuid.uuid4().hex[:8]}")
+    payload.custom_fields = {text: "X-42", number: 3}
+    created = write.create_device(payload, branch=branch)
+    assert created["custom_fields"] == {text: "X-42", number: 3}
+
+    patched = write.update_device(
+        created["id"], DeviceUpdate(custom_fields={number: 7}), branch=branch
+    )
+    assert patched["custom_fields"] == {text: "X-42", number: 7}
+
+    cleared = write.update_device(
+        created["id"], DeviceUpdate(custom_fields={text: None}), branch=branch
+    )
+    assert cleared["custom_fields"] == {text: None, number: 7}
+
+    with pytest.raises(NetBoxValidationError, match="must be an integer"):
+        write.update_device(
+            created["id"], DeviceUpdate(custom_fields={number: "abc"}), branch=branch
+        )
+
+    diff = write.get_branch_diff(branch, object_type="dcim.device", limit=1000)
+    entry = next(e for e in diff["results"] if e["object_id"] == created["id"])
+    assert entry["data"]["custom_fields"] == {text: None, number: 7}
+
+
+def test_get_resource_schema_lists_the_device_custom_fields(device_custom_fields):
+    fields = generic.get_resource_schema("device")["custom_fields"]["fields"]
+
+    assert fields[device_custom_fields["text"]]["type"] == "text"
+    assert fields[device_custom_fields["integer"]]["type"] == "integer"
