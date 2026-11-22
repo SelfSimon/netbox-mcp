@@ -381,6 +381,7 @@ def test_every_read_tool_reads_in_the_branch_it_is_given(monkeypatch, call):
 
 
 def test_a_read_without_branch_still_reads_main(monkeypatch):
+    monkeypatch.setenv("NETBOX_URL", "http://netbox.test")
     monkeypatch.setattr(read, "get_current_token", lambda: "caller-token")
     with read._client() as client:
         assert "X-NetBox-Branch" not in client._client.headers
