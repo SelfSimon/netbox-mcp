@@ -73,7 +73,7 @@ def journey() -> dict[str, Any]:
         expect(branch["status"]["value"], "ready", "branch status")
         b = j["branch"] = branch["schema_id"]
 
-    def create(resource: str, data: dict[str, Any]) -> dict[str, Any]:
+    def create(resource: str, data: Any) -> dict[str, Any]:
         return call(
             "write_resource", resource=resource, action="create", branch=b, data=data
         )
@@ -88,18 +88,21 @@ def journey() -> dict[str, Any]:
             "device_type",
             {"manufacturer": mfr["id"], "model": f"srv-{s}", "slug": f"srv-{s}"},
         )
-        # One by one for now; in a batch once NETBOX-146 is done.
-        j["templates"] = {
-            name: create(
+        # One batch per device type (NETBOX-146).
+        j["templates"] = {}
+        for dt, names in (
+            (j["switch_type"], ("eth0", "eth1", "eth2", "eth3")),
+            (j["server_type"], ("nic0", "nic1")),
+        ):
+            batch = create(
                 "interface_template",
-                {"device_type": dt["id"], "name": name, "type": "1000base-t"},
+                [
+                    {"device_type": dt["id"], "name": n, "type": "1000base-t"}
+                    for n in names
+                ],
             )
-            for dt, names in (
-                (j["switch_type"], ("eth0", "eth1", "eth2", "eth3")),
-                (j["server_type"], ("nic0", "nic1")),
-            )
-            for name in names
-        }
+            expect(batch["count"], len(names), "templates created in a batch")
+            j["templates"].update(zip(names, batch["results"], strict=True))
 
     with step(3, "create racked devices with tenant and owner"):
         j["tenant"] = create("tenant", {"name": f"tenant-{s}", "slug": f"tenant-{s}"})
@@ -126,16 +129,22 @@ def journey() -> dict[str, Any]:
         j["switch"] = device(f"sw-{s}", j["switch_type"], 10)
         j["server"] = device(f"srv-{s}", j["server_type"], 20)
 
-    with step(4, "rename interface templates"):
-        for old, new in (("eth0", "uplink0"), ("eth1", "uplink1")):
-            call(
-                "write_resource",
-                resource="interface_template",
-                action="patch",
-                branch=b,
-                object_id=j["templates"][old]["id"],
-                data={"name": new},
-            )
+    with step(4, "rename interface templates in a batch"):
+        renamed = call(
+            "write_resource",
+            resource="interface_template",
+            action="patch",
+            branch=b,
+            data=[
+                {"id": j["templates"][old]["id"], "name": new}
+                for old, new in (("eth0", "uplink0"), ("eth1", "uplink1"))
+            ],
+        )
+        expect(
+            [r["display"] for r in renamed["results"]],
+            ["uplink0", "uplink1"],
+            "templates renamed in a batch",
+        )
 
     with step(5, "delete then recreate a device"):
         j["deleted_switch"] = j["switch"]
@@ -364,21 +373,74 @@ def test_templates_renamed_between_two_devices_read_in_the_branch():
             expect(on_main["results"], [], f"{d['name']} on main")
 
 
-@pytest.mark.xfail(strict=True, reason="batch writes: NETBOX-146")
-def test_step_2_templates_can_be_created_in_a_batch(journey):
-    with step(2, "create interface templates in a batch"):
-        created = call(
-            "write_resource",
+def test_batches_of_templates_are_one_call_and_all_or_nothing():
+    """NETBOX-146 ticket scenario: 50 templates created in one call, 24 of
+    them renamed in one call, then a batch of 10 with one invalid element:
+    nothing of it is written, and the error names the element and field."""
+    s = uuid.uuid4().hex[:6]
+    with step(1, "create a branch and a device type"):
+        b = call("create_branch", name=f"netbox-mcp-test-146-{s}")["schema_id"]
+
+        def write(action: str, data: Any, resource: str = "interface_template"):
+            return call(
+                "write_resource",
+                resource=resource,
+                action=action,
+                branch=b,
+                data=data,
+            )
+
+        mfr = write("create", {"name": f"m-{s}", "slug": f"m-{s}"}, "manufacturer")
+        dt = write(
+            "create",
+            {"manufacturer": mfr["id"], "model": f"dt-{s}", "slug": f"dt-{s}"},
+            "device_type",
+        )
+
+    def names() -> list[str]:
+        found = call(
+            "get_resource",
             resource="interface_template",
-            action="create",
-            branch=journey["branch"],
-            data=[
-                {
-                    "device_type": journey["server_type"]["id"],
-                    "name": n,
-                    "type": "1000base-t",
-                }
-                for n in ("bmc0", "bmc1")
+            filters={"device_type_id": dt["id"]},
+            limit=1000,
+            branch=b,
+        )
+        return sorted(t["name"] for t in found["results"])
+
+    with step(2, "create 50 templates in one call"):
+        created = write(
+            "create",
+            [
+                {"device_type": dt["id"], "name": f"eth{i:02}", "type": "1000base-t"}
+                for i in range(50)
             ],
         )
-        expect(len(created), 2, "templates created")
+        expect(created["count"], 50, "templates created")
+        expect(names(), [f"eth{i:02}" for i in range(50)], "templates in the branch")
+
+    with step(3, "rename 24 templates in one call"):
+        renamed = write(
+            "patch",
+            [
+                {"id": t["id"], "name": f"up{i:02}"}
+                for i, t in enumerate(created["results"][:24])
+            ],
+        )
+        expect(renamed["count"], 24, "templates renamed")
+        want = sorted(
+            [f"up{i:02}" for i in range(24)] + [f"eth{i:02}" for i in range(24, 50)]
+        )
+        expect(names(), want, "names after the rename")
+
+    with step(4, "a batch of 10 with one invalid element writes nothing"):
+        bad = [
+            {
+                "device_type": dt["id"],
+                "name": f"bad{i}",
+                "type": "nope" if i == 7 else "1000base-t",
+            }
+            for i in range(10)
+        ]
+        with pytest.raises(ToolError, match=r"element 7: type: .*nope"):
+            write("create", bad)
+        expect(names(), want, "names after the rejected batch")

@@ -56,7 +56,10 @@ then use get_resource() / write_resource(). Call get_resource_schema()
 before write_resource() to learn the required fields and valid values.
 With write_resource(), prefer `action="patch"` (only the fields you change)
 over `action="update"` (a full replacement that needs every required
-field). `action="delete"` needs `confirm=True`.
+field). `action="delete"` needs `confirm=True`. To create or patch many
+objects of one resource, pass `data` as a list in ONE write_resource() call
+(up to 250; a patch element holds its object's `id`) rather than one call
+per object: the batch is all or nothing.
 """
 
 mcp = FastMCP(name="netbox-mcp", instructions=INSTRUCTIONS)

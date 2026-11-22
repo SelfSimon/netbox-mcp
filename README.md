@@ -112,7 +112,9 @@ tools instead of a dedicated one per object: `search_resources`,
 `get_resource`, `get_resource_schema`, and `write_resource`
 (`tools/generic.py`) — `get_resource_schema` discovers a resource's
 required/optional fields and valid values before you call `write_resource`
-on it. 19 of them (users, groups, permissions, tokens, owners, custom
+on it. `write_resource` also creates or patches many objects of one
+resource in a single call when `data` is a list (up to 250 elements,
+all or nothing — NETBOX-146). 19 of them (users, groups, permissions, tokens, owners, custom
 fields, webhooks, event rules, core objects, ...) are read-only through
 the MCP: netbox_branching does not version them, so a write would land
 directly on `main` — create or change them in the NetBox UI

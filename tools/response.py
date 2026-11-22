@@ -139,3 +139,16 @@ def write_response(value: Any) -> Any:
         "Read it back with `fields=[...]` if you need more."
     )
     return reduced
+
+
+def batch_response(objects: list[Any]) -> dict[str, Any]:
+    """Return a batch write's result (NETBOX-146): each object reduced to
+    its `id`, `url` and `display`, in the order of the batch, so a batch
+    of any size stays small. Read objects back for their full state."""
+    return {
+        "count": len(objects),
+        "results": [
+            {key: o[key] for key in ("id", "url", "display") if key in o}
+            for o in objects
+        ],
+    }

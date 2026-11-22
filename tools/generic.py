@@ -32,6 +32,7 @@ from client.rest import (
 )
 from netbox_mcp.auth import get_current_token
 from tools.response import (
+    batch_response,
     list_response,
     object_response,
     selection_params,
@@ -200,7 +201,7 @@ def write_resource(
     action: Literal["create", "update", "patch", "delete"],
     branch: str,
     object_id: int | None = None,
-    data: dict[str, Any] | None = None,
+    data: dict[str, Any] | list[dict[str, Any]] | None = None,
     confirm: bool = False,
 ) -> Any:
     """Create, update, patch, or delete a NetBox object of any resource
@@ -225,6 +226,16 @@ def write_resource(
     `action="delete"` additionally requires `confirm=True` — it is
     rejected otherwise. `create`/`update`/`patch` ignore `confirm`.
 
+    Batches: to create or patch many objects of one resource, pass `data`
+    as a list in ONE call instead of one call per object (at most 250
+    elements; split larger sets). `create` takes a list of payloads;
+    `patch` takes a list where each element holds the `id` of its object
+    plus the fields to change, with no `object_id`. A batch is all or
+    nothing: if any element is rejected, nothing is written, and the
+    error names the element by its index in `data`. A batch returns
+    `{count, results}`, one `{id, url, display}` per element in the order
+    of `data`. `update` and `delete` take one object at a time.
+
     Resources marked `writable: false` by search_resources() are refused
     for every action: netbox_branching does not version them, so the
     write would land directly on main. Tell the user to create or change
@@ -232,6 +243,8 @@ def write_resource(
     """
     _validate_resource(resource)
     _validate_writable(resource)
+    if isinstance(data, list):
+        return _write_batch(resource, action, branch, object_id, data)
     if action != "create" and object_id is None:
         raise ValueError(f"object_id is required for action={action!r}")
     if action == "delete" and not confirm:
@@ -252,6 +265,29 @@ def write_resource(
             )
         client.delete(resource, object_id)  # type: ignore[arg-type]
         return None
+
+
+def _write_batch(
+    resource: str,
+    action: str,
+    branch: str,
+    object_id: int | None,
+    data: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if action not in ("create", "patch"):
+        raise ValueError(
+            f"action={action!r} takes one object at a time: pass `data` as a "
+            "single object (batches are for create and patch)"
+        )
+    if object_id is not None:
+        raise ValueError(
+            "a batch takes no object_id: put the `id` of each object in its "
+            "element of `data`"
+        )
+    with _client(branch) as client:
+        if action == "create":
+            return batch_response(client.create_many(resource, data))
+        return batch_response(client.patch_many(resource, data))
 
 
 _SEARCH_ANNOTATIONS = ToolAnnotations(read_only_hint=True, idempotent_hint=True)
