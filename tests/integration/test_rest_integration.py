@@ -9,9 +9,9 @@ does), so the guard against merging into `main` is the absence of any
 merge/sync/revert call in the client — covered by
 tests/unit/test_branches.py, not by a NetBox permission.
 
-Test objects created here (sites, branches) accumulate in the target
-instance; clean them up periodically by hand in the NetBox UI. Names/slugs
-are suffixed with a random id to avoid collisions between runs.
+Sites created on main are deleted after each test (conftest.py
+`main_site`), and branches at the end of the session (NETBOX-148).
+Names/slugs are suffixed with a random id to avoid collisions between runs.
 """
 
 import uuid
@@ -26,13 +26,11 @@ from client.rest import NetBoxRestClient
 pytestmark = pytest.mark.integration
 
 
-def test_create_and_patch_site_round_trip():
-    slug = f"netbox-mcp-test-{uuid.uuid4().hex[:8]}"
+def test_create_and_patch_site_round_trip(main_site):
+    created = main_site()
+    assert created["name"] == created["slug"]
 
     with NetBoxRestClient() as rest_client:
-        created = rest_client.create("site", {"name": slug, "slug": slug})
-        assert created["name"] == slug
-
         patched = rest_client.patch(
             "site",
             created["id"],

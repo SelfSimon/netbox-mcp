@@ -7,9 +7,8 @@ Every write tool call here happens inside a netbox_branching branch created
 for the test; nothing reaches `main` directly (merge stays a human action
 from the NetBox UI, see client/branches.py).
 
-Test objects (branches, and everything created inside them) accumulate in
-the target instance; clean them up periodically by hand, same as
-test_rest_integration.py.
+The branches created here, and everything inside them, are deleted at
+the end of the session (conftest.py, NETBOX-148).
 """
 
 import uuid
