@@ -19,7 +19,7 @@ import time
 from typing import Any
 
 from .exceptions import NetBoxClientError, NetBoxNotFoundError, NetBoxValidationError
-from .rest import NetBoxRestClient
+from .rest import MAX_LIST_LIMIT, NetBoxRestClient
 
 _BRANCHES_PATH = "plugins/branching/branches/"
 _CHANGES_PATH = "plugins/branching/changes/"
@@ -85,11 +85,35 @@ def list_changes(
         ) from exc
 
 
-def count_changes(
+def list_all_changes(
     client: NetBoxRestClient, schema_id: str, filters: dict[str, Any] | None = None
-) -> int:
-    """Number of the branch's ChangeDiffs matching `filters`, in one request."""
-    return list_changes(client, schema_id, {**(filters or {}), "limit": 1})["count"]
+) -> list[dict[str, Any]]:
+    """Every ChangeDiff of the branch matching `filters`, page after page.
+
+    Pass a total `ordering` (e.g. "object_type,object_id"), or the pages
+    are not guaranteed to be disjoint.
+    """
+    changes: list[dict[str, Any]] = []
+    while True:
+        page = list_changes(
+            client,
+            schema_id,
+            {**(filters or {}), "limit": MAX_LIST_LIMIT, "offset": len(changes)},
+        )
+        changes.extend(page["results"])
+        if not page["results"] or len(changes) >= page["count"]:
+            return changes
+
+
+def is_noop(change: dict[str, Any]) -> bool:
+    """True for an object created, then deleted, in the branch.
+
+    netbox_branching never moves a ChangeDiff off `create` (NETBOX-144): a
+    later delete only empties its `modified_data`. The object exists
+    neither in main nor in the branch, and a merge skips it, so it is not
+    part of what the branch changes.
+    """
+    return change["action"]["value"] == "create" and not change.get("modified_data")
 
 
 def _clean(data: dict[str, Any] | None) -> dict[str, Any]:

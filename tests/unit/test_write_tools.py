@@ -6,7 +6,7 @@ from fastmcp import FastMCP
 
 from client.config import ClientSettings
 from client.exceptions import NetBoxNotFoundError
-from client.rest import BRANCH_HEADER, NetBoxRestClient
+from client.rest import BRANCH_HEADER, MAX_LIST_LIMIT, NetBoxRestClient
 from schemas.writes import (
     DeviceCreate,
     DeviceUpdate,
@@ -287,21 +287,23 @@ def change(id, action, object_type="dcim.site", object_id=1, **data):
     }
 
 
-def diff_handler(changes, seen=None, counts=None):
-    counts = counts or {"create": 1, "update": 1, "delete": 1}
+def diff_handler(changes, seen=None):
+    """Serve `changes` as NetBox would: paged by `limit`/`offset`."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/plugins/branching/changes/"
         assert BRANCH_HEADER not in request.headers
         if seen is not None:
             seen.append(request.url.params)
-        if request.url.params["limit"] == "1" and "action" in request.url.params:
-            count = counts[request.url.params["action"]]
-            return httpx.Response(
-                200, json={"count": count, "next": None, "results": []}
-            )
+        limit = int(request.url.params["limit"])
+        offset = int(request.url.params.get("offset", 0))
         return httpx.Response(
-            200, json={"count": len(changes), "next": None, "results": changes}
+            200,
+            json={
+                "count": len(changes),
+                "next": None,
+                "results": changes[offset : offset + limit],
+            },
         )
 
     return handler
@@ -391,30 +393,92 @@ def test_get_branch_diff_reports_conflicts_with_main(monkeypatch):
     }
 
 
-def test_get_branch_diff_filters_by_schema_id_type_and_action(monkeypatch):
+def test_get_branch_diff_filters_by_type_and_action_but_summarizes_all(
+    monkeypatch,
+):
+    changes = [
+        change(1, "create", "dcim.device", 5, modified={"name": "sw1"}),
+        change(2, "update", "dcim.device", 6, original={"x": 1}, modified={"x": 2}),
+        change(3, "update", "dcim.site", 7, original={"x": 1}, modified={"x": 2}),
+        change(4, "update", "dcim.device", 8, original={"x": 1}, modified={"x": 3}),
+    ]
     seen = []
     monkeypatch.setattr(
-        write, "_client", lambda branch=None: make_client(diff_handler([], seen))
+        write,
+        "_client",
+        lambda branch=None: make_client(diff_handler(changes, seen)),
     )
 
     result = write.get_branch_diff(
-        "br_abc123", object_type="dcim.device", action="update", limit=5, offset=10
+        "br_abc123", object_type="dcim.device", action="update", limit=1, offset=1
     )
 
-    page = seen[0]
-    assert page["branch"] == "br_abc123"
-    assert page["object_type"] == "dcim.device"
-    assert page["action"] == "update"
-    assert page["limit"] == "5"
-    assert page["offset"] == "10"
-    assert page["ordering"] == "object_type,object_id"
-    # The summary counts the whole branch: one request per action, without
-    # the object_type filter.
-    counts = seen[1:]
-    assert [c["action"] for c in counts] == ["create", "update", "delete"]
-    assert all(c["branch"] == "br_abc123" and "object_type" not in c for c in counts)
-    # No change on this page: the branch name falls back to the schema_id.
+    # The whole branch is read, ordered, by its schema_id.
+    assert seen[0]["branch"] == "br_abc123"
+    assert seen[0]["ordering"] == "object_type,object_id"
+    assert "object_type" not in seen[0] and "action" not in seen[0]
+    # Filters and paging apply to the matching changes...
+    assert [r["id"] for r in result["results"]] == [4]
+    assert result["count"] == 2
+    assert result["offset"] == 1
+    assert result["truncated"] is False
+    # ...the summary to the whole branch.
+    assert result["summary"] == {"create": 1, "update": 3, "delete": 0}
+
+
+def test_get_branch_diff_leaves_out_objects_created_then_deleted(monkeypatch):
+    # netbox_branching keeps them as a `create` with no modified_data
+    # (NETBOX-144): the merge skips them, so must the diff.
+    changes = [
+        change(1, "create", "dcim.device", 476),
+        change(2, "create", "dcim.interface", 1238),
+        change(3, "create", "dcim.device", 477, modified={"name": "sw1"}),
+        change(4, "delete", "dcim.site", 9, original={"name": "OLD"}),
+    ]
+    monkeypatch.setattr(
+        write, "_client", lambda branch=None: make_client(diff_handler(changes))
+    )
+
+    result = write.get_branch_diff("br_abc123")
+
+    assert [r["object_id"] for r in result["results"]] == [477, 9]
+    assert result["count"] == 2
+    assert result["summary"] == {"create": 1, "update": 0, "delete": 1}
+
+
+def test_get_branch_diff_reads_a_branch_bigger_than_one_page(monkeypatch):
+    changes = [
+        change(i, "create", object_id=i, modified={"name": f"s{i}"})
+        for i in range(MAX_LIST_LIMIT + 5)
+    ]
+    seen = []
+    monkeypatch.setattr(
+        write,
+        "_client",
+        lambda branch=None: make_client(diff_handler(changes, seen)),
+    )
+
+    result = write.get_branch_diff("br_abc123", limit=10, offset=MAX_LIST_LIMIT)
+
+    assert [p["offset"] for p in seen] == ["0", str(MAX_LIST_LIMIT)]
+    assert result["summary"]["create"] == MAX_LIST_LIMIT + 5
+    assert [r["object_id"] for r in result["results"]] == list(
+        range(MAX_LIST_LIMIT, MAX_LIST_LIMIT + 5)
+    )
+
+
+def test_get_branch_diff_on_an_empty_branch_falls_back_to_the_schema_id(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        write, "_client", lambda branch=None: make_client(diff_handler([]))
+    )
+
+    result = write.get_branch_diff("br_abc123")
+
     assert result["branch"] == "br_abc123"
+    assert result["count"] == 0
+    assert result["summary"] == {"create": 0, "update": 0, "delete": 0}
 
 
 def test_get_branch_diff_on_an_unknown_branch_says_to_pass_a_schema_id(monkeypatch):
