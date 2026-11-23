@@ -116,6 +116,12 @@ def ports_from_templates(templates: dict[PortKind, list[dict[str, Any]]]) -> lis
 Pattern = Literal["top-odd", "top-even", "row-major", "all"]
 
 
+# Widest grid a description may ask for. The widest real front panels
+# (a 1U 96-port patch panel, a 2U 48-port switch) are well under 200
+# columns; this bounds what a caller can make the server allocate.
+MAX_COLUMNS = 512
+
+
 class LayoutSection(BaseModel):
     """One block of columns, left to right, spanning every row of its band.
 
@@ -154,11 +160,12 @@ class LayoutSection(BaseModel):
         ),
     )
     spacer: int | None = Field(
-        default=None, ge=1, description="Number of empty gap columns."
+        default=None, ge=1, le=MAX_COLUMNS, description="Number of empty gap columns."
     )
     blank: int | None = Field(
         default=None,
         ge=1,
+        le=MAX_COLUMNS,
         description=(
             "Number of filler columns: chassis surface with no port (the left "
             "or right margin of the front panel)."
@@ -186,7 +193,7 @@ class LayoutBand(BaseModel):
     """A horizontal band of `rows` grid rows (2 rows per rack unit)."""
 
     rows: int = Field(ge=1, description="Grid rows in this band (2 per U).")
-    sections: list[LayoutSection] = Field(min_length=1)
+    sections: list[LayoutSection] = Field(min_length=1, max_length=MAX_COLUMNS)
 
 
 # -- Building ----------------------------------------------------------------
@@ -224,10 +231,16 @@ def _filler_names(taken: set[str]):
                 yield name
 
 
+class _RangeTooLongError(Exception):
+    """A range names more ports than the device type has."""
+
+
 class _Resolver:
     """Turns the names and ranges of a section into ports."""
 
     def __init__(self, ports: list[Port]) -> None:
+        # A range longer than this can't be a typo for real ports.
+        self._max_range = max(len(ports), MAX_COLUMNS)
         self._exact: dict[str, list[Port]] = defaultdict(list)
         self._folded: dict[str, list[Port]] = defaultdict(list)
         for port in ports:
@@ -248,6 +261,8 @@ class _Resolver:
             return None
         start, end = match["start"], match["end"]
         width = len(start) if start.startswith("0") else 0
+        if abs(int(end) - int(start)) + 1 > self._max_range:
+            raise _RangeTooLongError
         step = 1 if int(end) >= int(start) else -1
         return [
             f"{match['prefix']}{str(n).zfill(width)}"
@@ -259,7 +274,14 @@ class _Resolver:
     ) -> list[Port]:
         resolved: list[Port] = []
         for ref in refs:
-            names = self._expand(ref.strip(), kind)
+            try:
+                names = self._expand(ref.strip(), kind)
+            except _RangeTooLongError:
+                errors.append(
+                    f"{ref!r} spans more than {self._max_range} ports: the device "
+                    "type cannot have that many"
+                )
+                continue
             if names is None:
                 errors.append(f"unknown port {ref!r}")
                 continue
@@ -337,12 +359,25 @@ def build_layout(ports: list[Port], bands: list[LayoutBand], total_rows: int) ->
     errors: list[str] = []
     warnings: list[str] = []
 
+    # Both checked before any grid is allocated: the rows then come from
+    # the device type's height, and the columns are bounded.
     band_rows = sum(band.rows for band in bands)
     if band_rows != total_rows:
-        errors.append(
+        message = (
             f"the bands hold {band_rows} rows but the device type needs "
             f"{total_rows} (2 per U)"
         )
+        raise LayoutError([message])
+    for b, band in enumerate(bands, start=1):
+        fixed = sum(
+            (section.spacer or 0) + (section.blank or 0) for section in band.sections
+        )
+        if fixed > MAX_COLUMNS:
+            message = (
+                f"band {b}: its spacers and blanks span {fixed} columns, more "
+                f"than the {MAX_COLUMNS} a grid may have"
+            )
+            raise LayoutError([message])
 
     resolver = _Resolver(ports)
     fillers = _filler_names({port.stylename for port in ports})

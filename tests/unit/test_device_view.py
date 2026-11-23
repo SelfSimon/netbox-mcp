@@ -9,6 +9,7 @@ from client.config import ClientSettings
 from client.rest import BRANCH_HEADER, NetBoxRestClient
 from tools import device_view
 from tools.device_view_layout import (
+    MAX_COLUMNS,
     LayoutBand,
     LayoutError,
     LayoutSection,
@@ -207,6 +208,20 @@ def test_a_stylename_css_cannot_use_is_refused():
 def test_rows_must_add_up_to_the_device_height():
     with pytest.raises(LayoutError, match="needs 4 "):
         build_layout(SWITCH, _sections({"ports": ["port1-8"]}), 4)
+
+
+def test_a_huge_range_is_refused_without_expanding_it():
+    with pytest.raises(LayoutError, match="spans more than"):
+        build_layout(SWITCH, _sections({"ports": ["port1-999999999"]}), 2)
+
+
+def test_spacers_and_blanks_are_bounded():
+    with pytest.raises(ValidationError):
+        LayoutSection(spacer=MAX_COLUMNS + 1)
+    with pytest.raises(LayoutError, match="spacers and blanks span"):
+        build_layout(
+            SWITCH, _sections({"spacer": MAX_COLUMNS}, {"blank": MAX_COLUMNS}), 2
+        )
 
 
 def test_bands_stack_and_a_narrower_band_is_padded():
