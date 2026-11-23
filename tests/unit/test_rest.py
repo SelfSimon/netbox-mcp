@@ -8,11 +8,12 @@ from client.exceptions import (
     NetBoxNoBranchError,
     NetBoxNotBranchableError,
     NetBoxNotFoundError,
+    NetBoxNotWritableError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
 from client.registry import get_model_spec
-from client.rest import BRANCH_HEADER, NetBoxRestClient, not_branchable_message
+from client.rest import BRANCH_HEADER, NetBoxRestClient, not_writable_message
 
 
 def make_client(handler, branch: str | None = None) -> NetBoxRestClient:
@@ -822,6 +823,18 @@ def test_writes_to_a_non_branchable_resource_are_refused_before_any_request(
         getattr(client, method)(*args)
 
 
+def test_writes_to_a_read_only_resource_are_refused_with_its_reason():
+    # NETBOX-149: branchable, but a file upload the JSON payload cannot carry.
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request may reach NetBox")
+
+    client = make_client(handler, branch="br1")
+
+    with pytest.raises(NetBoxNotWritableError, match="file upload") as excinfo:
+        client.create("attachment", {"name": "x"})
+    assert not isinstance(excinfo.value, NetBoxNotBranchableError)
+
+
 def test_reads_of_a_non_branchable_resource_still_work():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/users/owners/1/"
@@ -830,12 +843,12 @@ def test_reads_of_a_non_branchable_resource_still_work():
     assert make_client(handler).get("owner", 1)["name"] == "Nord Quantique"
 
 
-def test_not_branchable_message_links_the_ui_url_never_netbox_url():
+def test_not_writable_message_links_the_ui_url_never_netbox_url():
     # NETBOX_URL may be internal (http://netbox:8080 in Docker): never a link.
     spec = get_model_spec("owner")
 
-    with_ui = not_branchable_message("owner", spec, "https://netbox.example.com")
-    without_ui = not_branchable_message("owner", spec)
+    with_ui = not_writable_message("owner", spec, "https://netbox.example.com")
+    without_ui = not_writable_message("owner", spec)
 
     assert with_ui.endswith("NetBox UI: https://netbox.example.com/users/owners/")
     assert without_ui.endswith("NetBox UI, page /users/owners/")
@@ -877,3 +890,133 @@ def test_a_plain_text_400_keeps_netbox_text():
         pytest.raises(NetBoxValidationError, match=r"\(400\): Something odd$"),
     ):
         client.get("site", 1)
+
+
+DEVICE_OPTIONS = {
+    "actions": {
+        "POST": {
+            "name": {"type": "string", "required": False, "label": "Name"},
+            "custom_fields": {
+                "type": "field",
+                "required": False,
+                "read_only": False,
+                "label": "Custom fields",
+            },
+        }
+    }
+}
+
+DEVICE_OBJECT_TYPES = [
+    {"app_label": "dcim", "model": "site", "rest_api_endpoint": "/api/dcim/sites/"},
+    {
+        "app_label": "dcim",
+        "model": "device",
+        "rest_api_endpoint": "/api/dcim/devices/",
+    },
+]
+
+DEVICE_CUSTOM_FIELDS = [
+    {
+        "name": "circuit_ref",
+        "type": {"value": "text", "label": "Text"},
+        "required": True,
+        "label": "Circuit ref",
+        "description": "",
+        "default": None,
+        "related_object_type": None,
+        "choice_set": None,
+    },
+    {
+        "name": "tier",
+        "type": {"value": "select", "label": "Selection"},
+        "required": False,
+        "label": "",
+        "description": "Support tier",
+        "default": "gold",
+        "related_object_type": None,
+        "choice_set": {"id": 4, "name": "Tiers", "url": "http://x/4/"},
+    },
+    {
+        "name": "backup_site",
+        "type": {"value": "object", "label": "Object"},
+        "required": False,
+        "label": "",
+        "description": "",
+        "default": None,
+        "related_object_type": "dcim.site",
+        "choice_set": None,
+    },
+]
+
+
+def custom_fields_handler(calls, object_types=DEVICE_OBJECT_TYPES, status=200):
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path, dict(request.url.params)))
+        if request.method == "OPTIONS":
+            return httpx.Response(200, json=DEVICE_OPTIONS)
+        if status != 200:
+            return httpx.Response(status, json={"detail": "nope"})
+        if request.url.path == "/api/core/object-types/":
+            return httpx.Response(
+                200, json={"count": len(object_types), "results": object_types}
+            )
+        assert request.url.path == "/api/extras/custom-fields/"
+        return httpx.Response(
+            200,
+            json={"count": len(DEVICE_CUSTOM_FIELDS), "results": DEVICE_CUSTOM_FIELDS},
+        )
+
+    return handler
+
+
+def test_schema_lists_the_custom_fields_defined_for_the_object_type():
+    calls = []
+    client = make_client(custom_fields_handler(calls))
+
+    custom_fields = client.schema("device")["custom_fields"]
+
+    assert ("GET", "/api/core/object-types/") == calls[1][:2]
+    assert calls[1][2]["app_label"] == "dcim"
+    assert calls[2][:2] == ("GET", "/api/extras/custom-fields/")
+    assert calls[2][2]["object_type"] == "dcim.device"
+    assert custom_fields["type"] == "object"
+    assert custom_fields["required"] is True
+    assert "null clears one" in custom_fields["help_text"]
+    assert custom_fields["fields"] == {
+        "circuit_ref": {"type": "text", "required": True, "label": "Circuit ref"},
+        "tier": {
+            "type": "select",
+            "required": False,
+            "description": "Support tier",
+            "default": "gold",
+            "choice_set": {"id": 4, "name": "Tiers"},
+        },
+        "backup_site": {
+            "type": "object",
+            "required": False,
+            "related_object_type": "dcim.site",
+        },
+    }
+
+
+def test_schema_keeps_the_generic_custom_fields_entry_for_an_unknown_object_type():
+    calls = []
+    client = make_client(custom_fields_handler(calls, object_types=[]))
+
+    assert client.schema("device")["custom_fields"] == {
+        "type": "field",
+        "required": False,
+        "label": "Custom fields",
+    }
+    assert len(calls) == 2
+
+
+def test_schema_without_rights_on_custom_fields_still_returns_the_schema():
+    calls = []
+    client = make_client(custom_fields_handler(calls, status=403))
+
+    schema = client.schema("device")
+
+    assert schema["name"]["type"] == "string"
+    help_text = schema["custom_fields"]["help_text"]
+    assert "cannot read the custom field definitions" in help_text

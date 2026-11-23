@@ -13,7 +13,9 @@ enough to make it usable through the generic `search_resources`/
 only needs a dedicated tool (`tools/read.py`/`tools/write.py`) and Pydantic
 schemas once it's high-usage enough to warrant precise validation and
 per-action MCP annotations (currently: site, device, interface, ip_address,
-vlan). Resources marked `branchable=False` are read-only through the MCP.
+vlan). Resources marked `branchable=False`, or with a `read_only` reason,
+are read-only through the MCP. Plugin resources (NETBOX-117) are entries
+like any other, under `plugins/`; their label names the plugin.
 See docs/OBJECT_COVERAGE.md for tracking.
 """
 
@@ -35,11 +37,21 @@ class ModelSpec:
         they are created by hand in the NetBox UI. Reads are unaffected.
         Checked against a live NetBox by
         tests/integration/test_rest_integration.py.
+    read_only: why the MCP never writes this resource although
+        netbox_branching versions it (e.g. a file upload, which the JSON
+        REST payload cannot carry); empty when it is writable. Reads are
+        unaffected.
     """
 
     rest_path: str
     label: str
     branchable: bool = True
+    read_only: str = ""
+
+    @property
+    def writable(self) -> bool:
+        """True when write_resource() and the client's writes accept it."""
+        return self.branchable and not self.read_only
 
 
 _REGISTRY: dict[str, ModelSpec] = {
@@ -212,6 +224,128 @@ _REGISTRY: dict[str, ModelSpec] = {
     "data_source": ModelSpec("core/data-sources/", "Data source", branchable=False),
     "data_file": ModelSpec("core/data-files/", "Data file", branchable=False),
     "job": ModelSpec("core/jobs/", "Job", branchable=False),
+    # -- Plugins (NETBOX-117) -------------------------------------------
+    # netbox_security: firewall/NAT/zone objects, all versioned by
+    # netbox_branching. Both *-rule-*-settings endpoints answer 500 on
+    # every read in 1.5.11 (plugin bug, see docs/OBJECT_COVERAGE.md).
+    "security_address": ModelSpec(
+        "plugins/netbox-security/addresses/", "Address (netbox_security)"
+    ),
+    "security_address_assignment": ModelSpec(
+        "plugins/netbox-security/address-assignments/",
+        "Address assignment (netbox_security)",
+    ),
+    "security_address_list": ModelSpec(
+        "plugins/netbox-security/address-lists/", "Address list (netbox_security)"
+    ),
+    "security_address_list_assignment": ModelSpec(
+        "plugins/netbox-security/address-list-assignments/",
+        "Address list assignment (netbox_security)",
+    ),
+    "security_address_set": ModelSpec(
+        "plugins/netbox-security/address-sets/", "Address set (netbox_security)"
+    ),
+    "security_address_set_assignment": ModelSpec(
+        "plugins/netbox-security/address-set-assignments/",
+        "Address set assignment (netbox_security)",
+    ),
+    "security_application": ModelSpec(
+        "plugins/netbox-security/applications/", "Application (netbox_security)"
+    ),
+    "security_application_assignment": ModelSpec(
+        "plugins/netbox-security/application-assignments/",
+        "Application assignment (netbox_security)",
+    ),
+    "security_application_item": ModelSpec(
+        "plugins/netbox-security/application-items/",
+        "Application item (netbox_security)",
+    ),
+    "security_application_set": ModelSpec(
+        "plugins/netbox-security/application-sets/", "Application set (netbox_security)"
+    ),
+    "security_application_set_assignment": ModelSpec(
+        "plugins/netbox-security/application-set-assignments/",
+        "Application set assignment (netbox_security)",
+    ),
+    "security_custom_prefix": ModelSpec(
+        "plugins/netbox-security/custom-prefixes/", "Custom prefix (netbox_security)"
+    ),
+    "security_zone": ModelSpec(
+        "plugins/netbox-security/security-zones/", "Security zone (netbox_security)"
+    ),
+    "security_zone_assignment": ModelSpec(
+        "plugins/netbox-security/security-zone-assignments/",
+        "Security zone assignment (netbox_security)",
+    ),
+    "security_zone_policy": ModelSpec(
+        "plugins/netbox-security/security-zone-policies/",
+        "Security zone policy (netbox_security)",
+    ),
+    "firewall_filter": ModelSpec(
+        "plugins/netbox-security/firewall-filters/", "Firewall filter (netbox_security)"
+    ),
+    "firewall_filter_assignment": ModelSpec(
+        "plugins/netbox-security/firewall-filter-assignments/",
+        "Firewall filter assignment (netbox_security)",
+    ),
+    "firewall_filter_rule": ModelSpec(
+        "plugins/netbox-security/firewall-filter-rules/",
+        "Firewall filter rule (netbox_security)",
+    ),
+    "firewall_filter_rule_from_setting": ModelSpec(
+        "plugins/netbox-security/firewall-filter-rule-from-settings/",
+        "Firewall filter rule from setting (netbox_security)",
+    ),
+    "firewall_filter_rule_then_setting": ModelSpec(
+        "plugins/netbox-security/firewall-filter-rule-then-settings/",
+        "Firewall filter rule then setting (netbox_security)",
+    ),
+    "nat_pool": ModelSpec(
+        "plugins/netbox-security/nat-pools/", "NAT pool (netbox_security)"
+    ),
+    "nat_pool_assignment": ModelSpec(
+        "plugins/netbox-security/nat-pool-assignments/",
+        "NAT pool assignment (netbox_security)",
+    ),
+    "nat_pool_member": ModelSpec(
+        "plugins/netbox-security/nat-pool-members/", "NAT pool member (netbox_security)"
+    ),
+    "nat_rule": ModelSpec(
+        "plugins/netbox-security/nat-rules/", "NAT rule (netbox_security)"
+    ),
+    "nat_rule_assignment": ModelSpec(
+        "plugins/netbox-security/nat-rule-assignments/",
+        "NAT rule assignment (netbox_security)",
+    ),
+    "nat_rule_set": ModelSpec(
+        "plugins/netbox-security/nat-rule-sets/", "NAT rule set (netbox_security)"
+    ),
+    "nat_rule_set_assignment": ModelSpec(
+        "plugins/netbox-security/nat-rule-set-assignments/",
+        "NAT rule set assignment (netbox_security)",
+    ),
+    "policer": ModelSpec(
+        "plugins/netbox-security/policers/", "Policer (netbox_security)"
+    ),
+    "policer_assignment": ModelSpec(
+        "plugins/netbox-security/policer-assignments/",
+        "Policer assignment (netbox_security)",
+    ),
+    "device_view": ModelSpec(
+        "plugins/device_view/device-view/", "Device view (netbox_device_view)"
+    ),
+    "attachment": ModelSpec(
+        "plugins/netbox-attachments/netbox-attachments/",
+        "Attachment (netbox_attachments)",
+        read_only=(
+            "an attachment is a file upload, which this MCP's JSON payloads "
+            "cannot carry"
+        ),
+    ),
+    "attachment_assignment": ModelSpec(
+        "plugins/netbox-attachments/netbox-attachment-assignments/",
+        "Attachment assignment (netbox_attachments)",
+    ),
 }
 
 

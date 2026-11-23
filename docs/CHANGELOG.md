@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.5.0] - 2026-11-22
+
+Nothing to change to deploy: same configuration as 0.4.0.
+
+### Added
+
+- The dedicated write tools (`create_device`, `update_device`,
+  `create_interface`, `update_interface`, `assign_ip_address`) take
+  `custom_fields` as `{name: value}`, so an object with custom fields no
+  longer needs `write_resource`. An update changes only the custom fields
+  it names; `null` clears one; NetBox validates the values (NETBOX-141).
+- `get_resource_schema` lists the custom fields defined for the resource
+  (type, required, default, choice set or related object type) instead of
+  a bare `custom_fields: field` entry (NETBOX-141).
+- Plugin objects in the generic tools (NETBOX-149): the 29 resources of
+  `netbox_security` (security zones and policies, NAT, firewall filters,
+  address and application sets, ...), `device_view` (`netbox_device_view`)
+  and `attachment_assignment` (`netbox_attachments`), written in a branch
+  like any other resource. `search_resources("netbox_security")` lists
+  them.
+- `attachment` (`netbox_attachments`) is readable but refused by
+  `write_resource`: it is a file upload, which a JSON payload cannot carry.
+- `build_device_view` generates a device type's `netbox_device_view` grid
+  (`grid_template_area`) from a description of its real front panel:
+  sections of ports (template names or ranges, filled `top-odd`,
+  `top-even`, `row-major` or on one row), spacers and blanks, per band of
+  rows. It computes each port's stylename the way the plugin does, keeps
+  every area a rectangle and every row the same length, refuses unknown,
+  ambiguous or duplicate ports, and reports the ports left out and those
+  sharing a stylename. `dry_run` (the default) returns the grid; otherwise
+  it creates or patches the device type's view in a branch. With no
+  description it refuses and lists the ports: it never guesses a layout.
+  What a description can make it allocate is bounded (512 columns of
+  spacers and blanks per band, ranges and port names capped) (NETBOX-150).
+
 ## [0.4.0] - 2026-11-22
 
 Nothing to change to deploy: same configuration as 0.3.2.

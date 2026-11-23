@@ -27,6 +27,7 @@ from .exceptions import (
     NetBoxNoBranchError,
     NetBoxNotBranchableError,
     NetBoxNotFoundError,
+    NetBoxNotWritableError,
     NetBoxPermissionError,
     NetBoxValidationError,
 )
@@ -60,19 +61,25 @@ def _bounded_params(filters: dict[str, Any] | None) -> dict[str, Any]:
     return params
 
 
-def not_branchable_message(resource: str, spec: ModelSpec, ui_url: str = "") -> str:
-    """Why `resource` cannot be written, and where to do it by hand.
+def not_writable_message(resource: str, spec: ModelSpec, ui_url: str = "") -> str:
+    """Why `resource` cannot be written, and where to do it by hand: not
+    versioned by netbox_branching, or a `read_only` reason.
 
     `ui_url` is NETBOX_UI_URL: with it the message holds a full link,
     without it only the page's path — NETBOX_URL may be an internal address
     the user's browser cannot open, so it is never used here.
     """
     where = f": {ui_url}/{spec.rest_path}" if ui_url else f", page /{spec.rest_path}"
+    why = (
+        spec.read_only
+        if spec.branchable
+        else "netbox_branching does not version it, so the write would land "
+        "directly on main with no review"
+    )
     return (
         f"{spec.label!r} ({resource}) cannot be written through this MCP: "
-        "netbox_branching does not version it, so the write would land "
-        "directly on main with no review. Ask the user to create or change "
-        f"it manually in the NetBox UI{where}"
+        f"{why}. Ask the user to create or change it manually in the NetBox "
+        f"UI{where}"
     )
 
 
@@ -230,6 +237,29 @@ def _simplify_field(field: dict[str, Any]) -> dict[str, Any] | None:
     return simplified
 
 
+def _custom_field(definition: dict[str, Any]) -> dict[str, Any]:
+    """Reduce one extras/custom-fields/ definition like _simplify_field()."""
+    kind = definition.get("type")
+    field: dict[str, Any] = {
+        "type": kind.get("value") if isinstance(kind, dict) else kind,
+        "required": bool(definition.get("required")),
+    }
+    for key in ("label", "description"):
+        if definition.get(key):
+            field[key] = definition[key]
+    if definition.get("default") is not None:
+        field["default"] = definition["default"]
+    if definition.get("related_object_type"):
+        field["related_object_type"] = definition["related_object_type"]
+    choice_set = definition.get("choice_set")
+    if isinstance(choice_set, dict):
+        field["choice_set"] = {
+            "id": choice_set.get("id"),
+            "name": choice_set.get("name"),
+        }
+    return field
+
+
 class NetBoxRestClient:
     """HTTP client for the local NetBox REST API."""
 
@@ -344,7 +374,61 @@ class NetBoxRestClient:
             simplified = _simplify_field(field)
             if simplified is not None:
                 result[name] = simplified
+        if "custom_fields" in result:
+            result["custom_fields"] = self._custom_fields_schema(
+                spec, result["custom_fields"]
+            )
         return result
+
+    def _custom_fields_schema(
+        self, spec: ModelSpec, generic: dict[str, Any]
+    ) -> dict[str, Any]:
+        """The custom fields defined for `spec`'s object type (NETBOX-141).
+
+        OPTIONS only says `custom_fields` is a field; the definitions live
+        in extras/custom-fields/, filtered by object type (`dcim.device`),
+        which core/object-types/ maps from the resource's REST path.
+        """
+        app_label = spec.rest_path.split("/", 1)[0]
+        endpoint = f"/api/{spec.rest_path}"
+        try:
+            object_types = self._page(
+                "core/object-types/",
+                {"app_label": app_label, "limit": MAX_LIST_LIMIT},
+            )["results"]
+            object_type = next(
+                (
+                    f"{o['app_label']}.{o['model']}"
+                    for o in object_types
+                    if o.get("rest_api_endpoint") == endpoint
+                ),
+                None,
+            )
+            if object_type is None:
+                return generic
+            definitions = self._page(
+                "extras/custom-fields/",
+                {"object_type": object_type, "limit": MAX_LIST_LIMIT},
+            )["results"]
+        except NetBoxPermissionError:
+            # The schema stays useful without them: say why they're missing.
+            return {
+                **generic,
+                "help_text": (
+                    "Your NetBox token cannot read the custom field "
+                    "definitions; ask the user which custom fields exist."
+                ),
+            }
+        return {
+            "type": "object",
+            "required": any(cf.get("required") for cf in definitions),
+            "label": generic.get("label", "Custom fields"),
+            "help_text": (
+                "Values by custom field name. A patch changes only the custom "
+                "fields it names; null clears one."
+            ),
+            "fields": {cf["name"]: _custom_field(cf) for cf in definitions},
+        }
 
     # -- Write ---------------------------------------------------------
 
@@ -463,11 +547,15 @@ class NetBoxRestClient:
 
     def _writable_spec(self, resource: str) -> ModelSpec:
         """The resource's spec, or NetBoxNotBranchableError when
-        netbox_branching would send the write straight to main."""
+        netbox_branching would send the write straight to main, or
+        NetBoxNotWritableError when the MCP only reads it (`read_only`)."""
         spec = get_model_spec(resource)
-        if not spec.branchable:
-            raise NetBoxNotBranchableError(
-                not_branchable_message(resource, spec, self._settings.netbox_ui_url)
+        if not spec.writable:
+            error = (
+                NetBoxNotWritableError if spec.branchable else NetBoxNotBranchableError
+            )
+            raise error(
+                not_writable_message(resource, spec, self._settings.netbox_ui_url)
             )
         return spec
 

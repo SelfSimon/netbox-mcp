@@ -166,3 +166,48 @@ def test_interface_mgmt_only():
     i = InterfaceCreate(device=1, name="mgmt", type="1000base-t", mgmt_only=True)
 
     assert i.to_payload()["mgmt_only"] is True
+
+
+_CUSTOM = {"circuit_ref": "X-42", "n": 3}
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        DeviceCreate(name="sw01", device_type=1, role=2, site=3, custom_fields=_CUSTOM),
+        InterfaceCreate(
+            device=1, name="eth0", type="1000base-t", custom_fields=_CUSTOM
+        ),
+        IPAddressAssign(
+            address="10.0.0.1/32", assigned_object_id=5, custom_fields=_CUSTOM
+        ),
+    ],
+    ids=["device", "interface", "ip_address"],
+)
+def test_create_schemas_send_custom_fields(schema):
+    assert schema.to_payload()["custom_fields"] == _CUSTOM
+
+
+@pytest.mark.parametrize("schema", [DeviceUpdate, InterfaceUpdate])
+def test_an_update_keeps_a_null_custom_field_to_clear_it(schema):
+    payload = schema(custom_fields={"circuit_ref": None, "tier": "gold"}).to_payload()
+
+    assert payload == {"custom_fields": {"circuit_ref": None, "tier": "gold"}}
+
+
+def test_an_update_without_custom_fields_sends_none():
+    assert "custom_fields" not in DeviceUpdate(serial="A").to_payload()
+
+
+def test_custom_fields_must_be_an_object():
+    with pytest.raises(ValidationError):
+        DeviceUpdate(custom_fields=["circuit_ref"])
+
+
+def test_the_custom_fields_description_says_how_to_discover_them():
+    description = DeviceUpdate.model_json_schema()["properties"]["custom_fields"][
+        "description"
+    ]
+
+    assert "get_resource_schema()" in description
+    assert "null clears one" in description

@@ -83,3 +83,37 @@ def test_only_the_resources_netbox_branching_ignores_are_not_branchable():
 def test_resources_are_branchable_by_default():
     assert get_model_spec("device").branchable is True
     assert get_model_spec("tag").branchable is True
+
+
+def test_plugin_resources_are_registered_under_plugins():
+    # NETBOX-149: netbox_security, netbox_device_view, netbox_attachments.
+    plugin = {
+        name: spec
+        for name, spec in iter_model_specs()
+        if spec.rest_path.startswith("plugins/")
+    }
+
+    security = {
+        n
+        for n, s in plugin.items()
+        if s.rest_path.startswith("plugins/netbox-security/")
+    }
+    assert len(security) == 29
+    assert all("(netbox_security)" in plugin[n].label for n in security)
+    assert get_model_spec("device_view").rest_path == "plugins/device_view/device-view/"
+    assert set(plugin) - security == {
+        "device_view",
+        "attachment",
+        "attachment_assignment",
+    }
+
+
+def test_a_read_only_resource_is_branchable_but_not_writable():
+    attachment = get_model_spec("attachment")
+
+    assert attachment.branchable is True
+    assert attachment.writable is False
+    assert "file upload" in attachment.read_only
+    assert get_model_spec("attachment_assignment").writable is True
+    assert get_model_spec("owner").writable is False
+    assert get_model_spec("security_zone").writable is True

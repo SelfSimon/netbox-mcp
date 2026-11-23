@@ -97,17 +97,24 @@ site, device, interface, ip_address, and vlan (`list_*`/`get_*` in
 `src/netbox_mcp/server.py`). Dedicated write tools are implemented for
 device and interface create/update, IP address assignment, and
 `netbox_branching` branch create/list (`tools/write.py`, same
-registration point) — every create/update tool requires an active branch,
+registration point) — they take `custom_fields` too (NETBOX-141), and
+every create/update tool requires an active branch,
 and merge stays a human-only action in the NetBox UI. Reads target `main`,
 or a branch when given its `schema_id` in `branch` (NETBOX-145).
 `get_branch_diff` (read-only, NETBOX-104) shows what a branch changes
 before that review: one entry per changed object, with the
 new object's fields (create), `{before, after}` per altered field
 (update), or its identity (delete), plus any conflict with `main`.
+`build_device_view` (`tools/device_view.py`, NETBOX-150) writes a device
+type's `netbox_device_view` grid from a description of its real front
+panel — port groups, gaps and margins, row by row — computing the
+plugin's stylename for each port; it previews the grid by default and
+never guesses a layout it isn't given.
 
 Every other NetBox object type registered in `client/registry.py`
-(110 of its 115 resources, across DCIM, IPAM, virtualization, circuits, tenancy,
-wireless, VPN, extras, and users/core) is reachable through four generic
+(142 of its 147 resources, across DCIM, IPAM, virtualization, circuits, tenancy,
+wireless, VPN, extras, users/core, and the `netbox_security`,
+`netbox_device_view` and `netbox_attachments` plugins — NETBOX-149) is reachable through four generic
 tools instead of a dedicated one per object: `search_resources`,
 `get_resource`, `get_resource_schema`, and `write_resource`
 (`tools/generic.py`) — `get_resource_schema` discovers a resource's
@@ -118,7 +125,8 @@ all or nothing — NETBOX-146). 19 of them (users, groups, permissions, tokens, 
 fields, webhooks, event rules, core objects, ...) are read-only through
 the MCP: netbox_branching does not version them, so a write would land
 directly on `main` — create or change them in the NetBox UI
-(NETBOX-142). Set `NETBOX_UI_URL` to NetBox's browser address so the
+(NETBOX-142). The plugin file uploads (`attachment`) are read-only
+too: a JSON payload cannot carry a file. Set `NETBOX_UI_URL` to NetBox's browser address so the
 refusal message links to the right page; `NETBOX_URL` is often internal
 (`http://netbox:8080` in Docker) and is never used for links. A resource only graduates to a dedicated tool once it's high-usage
 enough to warrant a precise Pydantic schema and per-action MCP

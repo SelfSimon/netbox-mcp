@@ -47,7 +47,16 @@ class NetBoxNoBranchError(NetBoxClientError):
     """
 
 
-class NetBoxNotBranchableError(NetBoxClientError):
+class NetBoxNotWritableError(NetBoxClientError):
+    """A write was attempted on a resource the MCP only reads.
+
+    Raised client-side, before any request is sent. The resource's
+    `ModelSpec.read_only` says why (e.g. a file upload, which a JSON
+    payload cannot carry); the user changes it in the NetBox UI.
+    """
+
+
+class NetBoxNotBranchableError(NetBoxNotWritableError):
     """A write was attempted on a resource netbox_branching does not version.
 
     netbox_branching ignores `X-NetBox-Branch` for models without change

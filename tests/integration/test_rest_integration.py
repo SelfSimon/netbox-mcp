@@ -103,3 +103,21 @@ def test_registry_branchable_flags_match_netbox_branching():
         if spec.branchable != (f"/api/{spec.rest_path}" in branching_endpoints)
     }
     assert mismatches == {}
+
+
+def test_every_registered_path_is_a_live_netbox_object_type():
+    """NETBOX-149: a plugin upgrade (NETBOX-143) may rename or drop an
+    endpoint; every `rest_path` must still be a REST endpoint NetBox
+    knows about."""
+    with NetBoxRestClient() as rest_client:
+        object_types = rest_client._request(
+            "GET", "core/object-types/", params={"limit": 1000}
+        ).json()["results"]
+
+    endpoints = {o["rest_api_endpoint"] for o in object_types}
+    missing = [
+        name
+        for name, spec in iter_model_specs()
+        if f"/api/{spec.rest_path}" not in endpoints
+    ]
+    assert missing == []

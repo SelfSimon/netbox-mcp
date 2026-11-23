@@ -657,3 +657,43 @@ def test_a_batch_of_a_non_branchable_resource_is_refused():
 
 def test_write_resource_documents_the_batch_limit():
     assert f"at most {MAX_BATCH_SIZE}" in generic.write_resource.__doc__
+
+
+def test_search_resources_finds_the_plugin_objects_by_plugin_name():
+    result = generic.search_resources("netbox_security")
+
+    assert result["count"] == 29
+    assert {r["resource"] for r in result["results"]} >= {
+        "security_zone",
+        "nat_rule",
+        "firewall_filter_rule",
+    }
+    assert all(r["writable"] for r in result["results"])
+
+
+def test_write_resource_refuses_a_read_only_plugin_resource_with_its_reason():
+    with pytest.raises(ValueError) as excinfo:
+        generic.write_resource("attachment", "create", branch="br1", data={})
+
+    message = str(excinfo.value)
+    assert "file upload" in message
+    assert "netbox_branching does not version it" not in message
+    assert "/plugins/netbox-attachments/netbox-attachments/" in message
+    assert generic.search_resources("attachment")["results"][0]["writable"] is False
+
+
+def test_write_resource_writes_a_plugin_object_in_the_branch(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/plugins/netbox-security/security-zones/"
+        assert request.headers[BRANCH_HEADER] == "br1"
+        return httpx.Response(201, json={"id": 7, "url": "u", "display": "dmz"})
+
+    monkeypatch.setattr(
+        generic, "_client", lambda branch=None: make_client(handler, branch=branch)
+    )
+
+    result = generic.write_resource(
+        "security_zone", "create", branch="br1", data={"name": "dmz"}
+    )
+
+    assert result["id"] == 7
