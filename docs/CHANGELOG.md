@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.5.0] - 2026-11-22
+
+Nothing to change to deploy: same configuration as 0.4.0.
+
 ### Added
 
 - The dedicated write tools (`create_device`, `update_device`,
@@ -31,8 +35,9 @@ All notable changes to this project will be documented in this file.
   ambiguous or duplicate ports, and reports the ports left out and those
   sharing a stylename. `dry_run` (the default) returns the grid; otherwise
   it creates or patches the device type's view in a branch. With no
-  description it refuses and lists the ports: it never guesses a layout
-  (NETBOX-150).
+  description it refuses and lists the ports: it never guesses a layout.
+  What a description can make it allocate is bounded (512 columns of
+  spacers and blanks per band, ranges and port names capped) (NETBOX-150).
 
 ## [0.4.0] - 2026-11-22
 
