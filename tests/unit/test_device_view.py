@@ -215,6 +215,15 @@ def test_a_huge_range_is_refused_without_expanding_it():
         build_layout(SWITCH, _sections({"ports": ["port1-999999999"]}), 2)
 
 
+def test_repeated_ranges_stop_expanding_past_the_bound():
+    with pytest.raises(ValidationError):
+        LayoutSection(ports=["port1-8"] * (MAX_COLUMNS + 1))
+
+    sections = [{"ports": ["port1-8"] * 100} for _ in range(10)]
+    with pytest.raises(LayoutError, match=f"names more than {MAX_COLUMNS} ports"):
+        build_layout(SWITCH, _sections(*sections), 2)
+
+
 def test_spacers_and_blanks_are_bounded():
     with pytest.raises(ValidationError):
         LayoutSection(spacer=MAX_COLUMNS + 1)

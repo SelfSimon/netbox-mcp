@@ -130,6 +130,7 @@ class LayoutSection(BaseModel):
 
     ports: list[str] | None = Field(
         default=None,
+        max_length=MAX_COLUMNS,
         description=(
             "Ports of this block, in order: template names (e.g. "
             '"GigabitEthernet1/0/1") or ranges "<prefix><start>-<end>" '
@@ -239,8 +240,12 @@ class _Resolver:
     """Turns the names and ranges of a section into ports."""
 
     def __init__(self, ports: list[Port]) -> None:
-        # A range longer than this can't be a typo for real ports.
+        # A range longer than this can't be a typo for real ports. It also
+        # bounds the names expanded over the whole description: a valid one
+        # names each port once, so past it the description is wrong anyway.
+        self._count = len(ports)
         self._max_range = max(len(ports), MAX_COLUMNS)
+        self._expanded = 0
         self._exact: dict[str, list[Port]] = defaultdict(list)
         self._folded: dict[str, list[Port]] = defaultdict(list)
         for port in ports:
@@ -285,6 +290,14 @@ class _Resolver:
             if names is None:
                 errors.append(f"unknown port {ref!r}")
                 continue
+            self._expanded += len(names)
+            if self._expanded > self._max_range:
+                message = (
+                    f"the description names more than {self._max_range} "
+                    "ports: each port is placed once, and the device type "
+                    f"has {self._count}"
+                )
+                raise LayoutError([*errors, message])
             missing = []
             for name in names:
                 found = self._lookup(name, kind)
@@ -355,6 +368,10 @@ def build_layout(ports: list[Port], bands: list[LayoutBand], total_rows: int) ->
     ports, a port placed twice, a stylename the browser cannot use, bands
     that do not add up to the device's rows, or an area that is not a
     rectangle.
+
+    What a description can make this allocate is bounded: the rows are the
+    device type's, a band's spacers and blanks take at most MAX_COLUMNS,
+    and the port columns at most max(port count, MAX_COLUMNS) in all.
     """
     errors: list[str] = []
     warnings: list[str] = []
