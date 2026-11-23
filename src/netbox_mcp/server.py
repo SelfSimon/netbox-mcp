@@ -11,6 +11,7 @@ from fastmcp import FastMCP
 from starlette.middleware import Middleware
 
 from netbox_mcp.auth import TokenCaptureMiddleware
+from tools.device_view import register as register_device_view_tools
 from tools.generic import register as register_generic_tools
 from tools.read import register as register_read_tools
 from tools.write import register as register_write_tools
@@ -65,6 +66,10 @@ Custom fields go in `custom_fields` as {name: value}, with the dedicated
 write tools or write_resource(); get_resource_schema() lists those defined
 for an object type, e.g. get_resource_schema("device"). An update changes
 only the custom fields it names; null clears one.
+To draw a device type's ports in netbox_device_view, use build_device_view()
+rather than writing `grid_template_area` by hand. It needs the real front
+panel layout, from the vendor's documentation or the user: never invent it.
+Show its dry_run grid to the user before writing.
 """
 
 mcp = FastMCP(name="netbox-mcp", instructions=INSTRUCTIONS)
@@ -72,6 +77,7 @@ mcp = FastMCP(name="netbox-mcp", instructions=INSTRUCTIONS)
 register_read_tools(mcp)
 register_write_tools(mcp)
 register_generic_tools(mcp)
+register_device_view_tools(mcp)
 
 
 async def _run() -> None:

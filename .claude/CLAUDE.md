@@ -27,6 +27,10 @@
 - `tools/generic.py` — `search_resources`/`get_resource`/`write_resource`,
   covering every resource in `client/registry.py` that has no dedicated
   tool; same `branch`/`main` rules as above.
+- `tools/device_view.py` — `build_device_view` (NETBOX-150), over the pure
+  `tools/device_view_layout.py`: stylenames copied from netbox_device_view
+  (`utils.py`), grid built from a front-panel description. Never add a
+  default/guessed layout mode — no description means a refusal.
 - `tools/response.py` — shared result shaping: every list tool returns the
   envelope `{count, returned, offset, truncated, next_offset, results}`
   (`list_response`), and every result is capped in size

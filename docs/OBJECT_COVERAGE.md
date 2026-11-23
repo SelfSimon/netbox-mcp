@@ -218,7 +218,7 @@ which is the source of truth — check it before trusting this table.
 | Plugin | Version | REST endpoint | Registry | Dedicated tool |
 |---|---|---|---|---|
 | `netbox_security` | 1.5.11 | `plugins/netbox-security/` (29 resources) | ✅ | ⬜ |
-| `netbox_device_view` | 0.4.0 | `plugins/device_view/device-view/` (`device_view`) | ✅ | ⬜ grid generator: NETBOX-150 |
+| `netbox_device_view` | 0.4.0 | `plugins/device_view/device-view/` (`device_view`) | ✅ | `build_device_view` (NETBOX-150) |
 | `netbox_attachments` | 11.3.1 | `plugins/netbox-attachments/` (`attachment` 🔒, `attachment_assignment`) | ✅ | ⬜ |
 | `netbox_topology_views` | 4.5.1 | `plugins/netbox_topology_views/` — map coordinates | not covered | — |
 | `netbox_reorder_rack` | 1.1.4 | none (empty API root) | not covered | — |
@@ -233,6 +233,10 @@ which is the source of truth — check it before trusting this table.
   every read of `firewall_filter_rule_from_setting` and
   `firewall_filter_rule_then_setting` answers 500, and
   `attachment_assignment` answers 500 when `brief=True`.
+- netbox_device_view 0.4.0's API ignores every query filter
+  (`?device_type=`, even `?id=`): a list always returns all the views.
+  `build_device_view` reads them all to find a device type's view; read a
+  single one with `get_resource("device_view", object_id=...)`.
 
 `netbox_branching` (1.1.3) is also installed but deliberately kept out of
 the registry — see below.

@@ -105,6 +105,11 @@ or a branch when given its `schema_id` in `branch` (NETBOX-145).
 before that review: one entry per changed object, with the
 new object's fields (create), `{before, after}` per altered field
 (update), or its identity (delete), plus any conflict with `main`.
+`build_device_view` (`tools/device_view.py`, NETBOX-150) writes a device
+type's `netbox_device_view` grid from a description of its real front
+panel — port groups, gaps and margins, row by row — computing the
+plugin's stylename for each port; it previews the grid by default and
+never guesses a layout it isn't given.
 
 Every other NetBox object type registered in `client/registry.py`
 (142 of its 147 resources, across DCIM, IPAM, virtualization, circuits, tenancy,

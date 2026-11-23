@@ -22,6 +22,17 @@ All notable changes to this project will be documented in this file.
   them.
 - `attachment` (`netbox_attachments`) is readable but refused by
   `write_resource`: it is a file upload, which a JSON payload cannot carry.
+- `build_device_view` generates a device type's `netbox_device_view` grid
+  (`grid_template_area`) from a description of its real front panel:
+  sections of ports (template names or ranges, filled `top-odd`,
+  `top-even`, `row-major` or on one row), spacers and blanks, per band of
+  rows. It computes each port's stylename the way the plugin does, keeps
+  every area a rectangle and every row the same length, refuses unknown,
+  ambiguous or duplicate ports, and reports the ports left out and those
+  sharing a stylename. `dry_run` (the default) returns the grid; otherwise
+  it creates or patches the device type's view in a branch. With no
+  description it refuses and lists the ports: it never guesses a layout
+  (NETBOX-150).
 
 ## [0.4.0] - 2026-11-22
 
